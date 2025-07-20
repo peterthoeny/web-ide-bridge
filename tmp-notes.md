@@ -232,6 +232,66 @@ I see that you specify code in developer_context.md. What percentage of code com
 
 ------------------------------
 
+Add the `.gitignore`
+
+I am pondering alternative names to WedDevSync, looking for a descriptive and memorable name:
+- WedDevSync
+- SyncWeb2IDE
+- BridgeWeb2IDE
+- BridgeWebToIDE
+- WebToIDEBridge
+- WebToIdeBridge
+- Web IDE Bridge
+- Web-IDE Bridge
+- Web-IDE-Bridge
+
+Also I am wondering if there is a better label for the "External Editor" button?
+- "External Editor"
+- "Edit in IDE"
+
 ------------------------------
+
+Agreed, change:
+- project name to `Web-IDE-Bridge`
+- button to `Edit in IDE ↗`
+
+Rename all references in README.md and dev context accordingly.
+
+Using Cursor, how do I rename a repository? Or, better done in the github GUI?
+
+------------------------------
+
+Using Cursor, how do I rename a repository? Or, better done in the github GUI?
+
+README.md:
+- change title to: `# Web-IDE-Bridge v0.1.3 (work in progress)`
+- remove `### .gitignore` file section (but keep in Project Structure)
+- in `## Quick Start`, change multiple installs to a single `npm install -g web-ide-bridge` that pulls the whole project structure
+- there are 9 references left of `web-dev-sync` and `webdevsync`
+
+developer_context.md:
+- something is messed up, it does not start with the heading
+- set heading to `# Web-IDE-Bridge Developer Context v0.1.3 (work in progress)
+- there are 26 references left of `web-dev-sync` and `webdevsync`
+
+------------------------------
+
+still something messed up with den context doc: `# WebDevSync status and debug endpoints` is shown on top
+
+------------------------------
+
+please fix the dev context doc, it still starts with `# Web-IDE-Bridge status and debug endpoints`
+
+------------------------------
+
+still something off. the dev context doc ends with `### Error Recovery Strategies`, and the `### Load Balancing and High Availability` section and content after that is missing
+
+------------------------------
+
+the doc still stops at `Error Recovery Strategies`
+
+------------------------------
+
+now fix README.md, it still has 12 references of  `web-dev-sync` and `webdevsync`
 
 ------------------------------
