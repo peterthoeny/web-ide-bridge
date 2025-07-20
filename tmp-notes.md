@@ -1,8 +1,11 @@
+Prompts for Claude Sonnet 4 AI
+------------------------------
+
 Attached is the description of an existing application I wrote using AI that I intend to recreate clean of IP.
 
 Before I ask you to create a README.md and a developer_context.md for that spec, let me know if there is another way around the JavaScript sandbox in the browser that avoids server side code. Is there a way to launch an IDE directly when a user presses the [External Editor] button below a textarea? Assume that the web app has an Edit button, which opens a dialog box/goes to a different screen that may have several textareas of different types (txt, html, js, css, py).
 
---------
+------------------------------
 
 The WebDevSync tool is tailored for web applicatons that allows users to edit code snippets in textarea elements. Programmers miss the rich feature set of desktop IDEs in browser based apps, such as syntax highlighting, code completion, indent change, and more. WebDevSync allows users to lauch their favorite IDE right from the web application. After saving the local file in the IDE, the changes are automatically synchronized back to the textarea of the web application.
 
@@ -110,7 +113,7 @@ Notes:
     - user ID, default is user ID of OS (needed by web-dev-sync-server to route code snippets to proper desktop)
     - websocket URL
 
-----------------------------
+------------------------------
 
 Enhance README.md:
 - Architecture diagram:
@@ -153,3 +156,79 @@ Enhance README.md:
 
 Enhance developer_context.md:
 - enhance based on updated README.md
+
+------------------------------
+
+* remove reference to Electron, and only use Tauri
+* make docker an option, .e.g. "in case you use docker..."
+* let's start simple, use single node instance for web-dev-sync-server, no redis
+* document default port 8071 instead of 8080
+* make a distinction of URIs the users sees on the web server (such as /web-dev-sync/ws, /web-dev-sync/status) and the web-dev-sync-server app (such as /ws, /status) -- sorry, so the original was likely correct: `  websocketEndpoint: '/ws',`
+* desktop config: document the default ws endpoint as `ws://localhost:8071/ws` for dev deployment, and `wss://webapp.example.com/web-dev-sync/ws` for production deployment with reverse proxy
+* same for monitoring => status and debug, such as `http://localhost:8080/status` for dev, and `https://webapp.example.com/web-dev-sync/status` for prod
+
+------------------------------
+
+README.md:
+- sorry, in hindsight, it's probably less confusing if the endpoints in in front and back of reverse proxy are the same, e.g.
+  - `websocketEndpoint: '/web-dev-sync/ws'`
+  -  `/web-dev-sync/ws`, `/web-dev-sync/status` , `/web-dev-sync/debug` for cosistency
+  - `location /web-dev-sync/` has: `proxy_pass http://localhost:8071/web-dev-sync/;`
+  - same fix for `location /web-dev-sync/ws`
+  - `http://localhost:8071/status` becomes `http://localhost:8071/web-dev-sync/status`
+  - same fix for `http://localhost:8071/debug`
+- cors origin, which should list `https://webapp.example.com` for consistency.
+
+developer_context.md:
+- remove reference to Electron
+- match README.md, such as port number 8071 instead of 8080, and `webapp.example.com` instead of `yourapp.com`
+- docker should also reference port 8071 instead of 8080
+- in nginx for prod, proxy_pass is listed twice, keep only http://webdevsync-backend
+- in `upstream webdevsync-backend` should reference `localhost:8071` for dev, and a single app server for prod, such as http://app-123.us-west.example.com:8071/web-dev-sync/ws;
+
+------------------------------
+
+almost there.
+
+developer_context.md:
+* Docker deployment still references port 8080
+* Nginx Configuration for Production still references port 8080
+
+------------------------------
+
+could you list the complete developer_context.md file? v29 only starts with '**Server Deployment**'
+
+------------------------------
+
+oops, something is not right, v30 ends with:
+```handleIDENotFound() { *// Show user-friendly error and configuration dialog* this.app.showErrorDialog({```
+
+------------------------------
+
+Add a directory and file list to README.md:
+
+- README.md                   -- readme, getting started
+- LICENSE                     -- license file
+- developer_context.md        -- developer context
+- browser:                    -- browser side tier
+  - demo.html                 -- demo page with two textarea forms
+  - web-dev-sync.js           -- implements WebDevSync
+- desktop:                    -- desktop tier (Windows, macOS)
+  - README.md                 -- readme, points to README.md of repository root
+  - web-dev-sync.rs           -- rust backend
+  - web-dev-sync.js           -- JavaScript frontend
+  - ?? (what else?)
+- server:                     -- server side tier
+  - README.md                 -- readme, points to README.md of repository root
+  - package.json              -- package file
+  - package-lock.json         -- package file
+  - web-dev-sync-server.conf  -- configuration file
+  - web-dev-sync-server.js    -- node.js application
+
+I see that you specify code in developer_context.md. What percentage of code complete is that? I did not ask to do that yet.
+
+------------------------------
+
+------------------------------
+
+------------------------------
