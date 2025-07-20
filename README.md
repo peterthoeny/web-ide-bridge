@@ -1,4 +1,4 @@
-# WebDevSync v0.1.1 (work in progress)
+# WebDevSync v0.1.2 (work in progress)
 
 **Bridge the gap between web applications and desktop IDEs**
 
@@ -23,6 +23,38 @@ WebDevSync provides a seamless bridge that allows you to:
 2. **Automatically launch** your preferred IDE with the code snippet
 3. **Edit with full IDE features** including syntax highlighting, completion, etc.
 4. **Save in your IDE** and see changes instantly synchronized back to the web application
+
+## Project Structure
+
+```
+WebDevSync/
+├── README.md                           # Getting started guide
+├── LICENSE                             # GPL v3 license file
+├── developer_context.md                # Technical implementation guide
+├── browser/                            # Browser-side tier
+│   ├── demo.html                       # Demo page with textarea forms
+│   └── web-dev-sync.js                 # WebDevSync client library
+├── desktop/                            # Desktop tier (Windows, macOS)
+│   ├── README.md                       # Points to repository root README
+│   ├── web-dev-sync.conf               # Desktop app configuration
+│   ├── web-dev-sync.js                 # JavaScript frontend (Tauri)
+│   ├── web-dev-sync.rs                 # Rust backend (Tauri)
+│   ├── Cargo.toml                      # Rust dependencies
+│   ├── tauri.conf.json                 # Tauri configuration
+│   ├── package.json                    # Node.js dependencies
+│   ├── package-lock.json               # Locked dependencies
+│   └── src-tauri/                      # Tauri Rust source
+│       ├── Cargo.toml                  # Rust project config
+│       ├── build.rs                    # Build script
+│       └── src/
+│           └── main.rs                 # Main Rust application
+└── server/                             # Server-side tier
+    ├── README.md                       # Points to repository root README
+    ├── package.json                    # Node.js package configuration
+    ├── package-lock.json               # Locked dependencies
+    ├── web-dev-sync-server.conf        # Server configuration file
+    └── web-dev-sync-server.js          # Node.js WebSocket server
+```
 
 ## Architecture
 

@@ -215,6 +215,7 @@ Add a directory and file list to README.md:
   - web-dev-sync.js           -- implements WebDevSync
 - desktop:                    -- desktop tier (Windows, macOS)
   - README.md                 -- readme, points to README.md of repository root
+  - web-dev-sync.conf         -- configuration file
   - web-dev-sync.rs           -- rust backend
   - web-dev-sync.js           -- JavaScript frontend
   - ?? (what else?)
@@ -224,6 +225,8 @@ Add a directory and file list to README.md:
   - package-lock.json         -- package file
   - web-dev-sync-server.conf  -- configuration file
   - web-dev-sync-server.js    -- node.js application
+
+Any other files missing? List as needed.
 
 I see that you specify code in developer_context.md. What percentage of code complete is that? I did not ask to do that yet.
 
