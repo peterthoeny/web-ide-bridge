@@ -148,9 +148,8 @@ Enhance README.md:
   - change license to GPL v3
 
 - add build instructions for WebDevSync desktop app
-  - separate for macOS and Windows
-  - assume Electron
-  - however: is there a better solution for macOS and Windows that is less resource intensive than Electron? if so propose and document that
+  - separate instructions for macOS and Windows
+  - assume Electron (however: is there a better solution for macOS and Windows that is less resource intensive than Electron? if so propose and document that)
 
 Enhance developer_context.md:
 - enhance based on updated README.md

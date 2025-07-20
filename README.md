@@ -1,4 +1,4 @@
-# WebDevSync v0.1.0 (work in progress)
+# WebDevSync v0.1.1 (work in progress)
 
 **Bridge the gap between web applications and desktop IDEs**
 
@@ -43,12 +43,18 @@ WebDevSync consists of three components working together:
 
 ## Quick Start
 
+### Prerequisites
+
+- **Node.js** (v14+ recommended)
+- **npm**
+- **Rust** (for desktop application)
+
 ### 1. Set Up the Server
 
 ```bash
 # Install and run the WebSocket relay server
 npm install -g web-dev-sync-server
-web-dev-sync-server --port 8080
+web-dev-sync-server --port 8071
 ```
 
 ### 2. Install Desktop Application
@@ -63,7 +69,7 @@ Configure your preferred IDE and WebSocket server URL on first launch.
 
 ```html
 <!-- Include the JavaScript library -->
-<script src="https://cdn.jsdelivr.net/npm/web-dev-sync@latest/dist/web-dev-sync.min.js"></script>
+<script src="/path/to/web-dev-sync/web-dev-sync.min.js"></script>
 
 <script>
 // Initialize WebDevSync
@@ -138,15 +144,17 @@ WebDevSync works with any IDE that can be launched from the command line:
 
 ### Server Configuration
 
+Copy `web-dev-sync-server.conf` to `/etc`, and change options as needed.
+
 The web-dev-sync-server supports these options:
 
 ```javascript
 {
-  port: 8080,
-  websocketEndpoint: '/ws',
+  port: 8071,
+  websocketEndpoint: '/web-dev-sync/ws',
   heartbeatInterval: 30000,
   cors: {
-    origin: ['http://localhost:3000', 'https://yourapp.com'],
+    origin: ['http://localhost:3000', 'https://webapp.example.com'],
     credentials: true
   },
   session: {
@@ -159,19 +167,143 @@ The web-dev-sync-server supports these options:
 }
 ```
 
+#### Running with npm
+
+```bash
+# Development
+npm start
+
+# Production - use a process manager like pm2
+npm install -g pm2
+pm2 start web-dev-sync-server --name webdevsync
+pm2 startup  # Enable auto-start on boot
+pm2 save     # Save current process list
+```
+
+#### Reverse Proxy Configuration
+
+**Purpose**: The web-dev-sync-server should be accessible under the same port and URI as your web application.
+
+**Important Notes**:
+- WebSocket endpoint may change from `ws://` to `wss://` in production
+- Endpoints are consistent on both sides of the reverse proxy for simplicity
+
+**Example nginx configuration**:
+
+```nginx
+# Status and debug endpoints
+location /web-dev-sync/ {
+    proxy_pass http://localhost:8071/web-dev-sync/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# WebSocket endpoint
+location /web-dev-sync/ws {
+    proxy_pass http://localhost:8071/web-dev-sync/ws;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400;
+}
+```
+
+#### Docker Deployment (Optional)
+
+In case you use Docker, you can run web-dev-sync-server in a container:
+
+```bash
+# Build image
+docker build -t webdevsync-server .
+
+# Run container
+docker run -d \
+  --name webdevsync \
+  -p 8071:8071 \
+  -v /etc/web-dev-sync-server.conf:/app/config.conf \
+  webdevsync-server
+```
+
+**Example docker-compose.yml**:
+
+```yaml
+version: '3.8'
+services:
+  webdevsync-server:
+    image: webdevsync-server
+    container_name: webdevsync
+    ports:
+      - "8071:8071"
+    volumes:
+      - /etc/web-dev-sync-server.conf:/app/config.conf
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+```
+
 ### Desktop App Configuration
 
 Configure through the desktop application settings:
-- **WebSocket URL**: Server endpoint (e.g., `ws://localhost:8080/ws`)
+- **WebSocket URL**: 
+  - Development: `ws://localhost:8071/web-dev-sync/ws`
+  - Production: `wss://webapp.example.com/web-dev-sync/ws`
 - **Preferred IDE**: Command to launch your IDE
 - **User ID**: Identifier for routing (defaults to OS username)
 - **Debug Mode**: Enable verbose logging
+
+#### Building the Desktop Application
+
+The desktop application is built using **Tauri** for lightweight, high-performance native apps with much smaller bundle sizes and lower resource usage compared to traditional Electron applications.
+
+**macOS Build Instructions**:
+
+```bash
+cd webdevsync-desktop
+npm install
+
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh
+
+# Install Tauri CLI
+cargo install tauri-cli
+npm install -g @tauri-apps/cli
+
+npm run tauri build
+```
+
+**Windows Build Instructions**:
+
+```bash
+cd webdevsync-desktop
+npm install
+
+# Install Rust if not already installed
+# Download from https://rustup.rs/ or use winget
+winget install Rust.Rustup
+
+npm run tauri build
+```
+
+**Why Tauri**:
+- **Size**: 90% smaller app bundles (~10MB vs ~100MB)
+- **Memory**: 50-80% less RAM usage  
+- **Security**: Better sandboxing and security model
+- **Performance**: Native WebView performance
+- **System Integration**: Better OS integration
 
 ## Monitoring
 
 ### Server Status Page
 
-Visit `http://localhost:8080/status` to see:
+**Development**: Visit `http://localhost:8071/web-dev-sync/status` to see:
+**Production**: Visit `https://webapp.example.com/web-dev-sync/status` to see:
+
 - Server active status
 - Active browser connections
 - Active desktop connections  
@@ -180,12 +312,15 @@ Visit `http://localhost:8080/status` to see:
 
 ### Debug Information
 
-Visit `http://localhost:8080/debug` for detailed JSON information about all active connections and sessions.
+**Development**: Visit `http://localhost:8071/web-dev-sync/debug` for detailed JSON information
+**Production**: Visit `https://webapp.example.com/web-dev-sync/debug` for detailed JSON information
+
+Shows all active connections and sessions for troubleshooting.
 
 ## Security Considerations
 
 - WebDevSync creates temporary files in your system's temp directory
-- Files are automatically cleaned up after editing sessions
+- Files are cleaned up periodically based on age
 - WebSocket connections use session-based routing to ensure code snippets reach the correct user
 - No code is stored permanently on the server
 
@@ -220,4 +355,4 @@ WebDevSync is open source and welcomes contributions:
 
 ## License
 
-MIT License - see LICENSE file for details.
+GPL v3 License - see LICENSE file for details.
