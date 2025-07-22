@@ -295,3 +295,160 @@ the doc still stops at `Error Recovery Strategies`
 now fix README.md, it still has 12 references of  `web-dev-sync` and `webdevsync`
 
 ------------------------------
+
+Next step: implement the Web-IDE-Bridge in phases. Consider yourself an experienced full stack coder developer with 10+ years of experience.
+
+First task: Based on README and developer context, implement the server tier. let me know the content of the 4 files in server/ directory.
+
+------------------------------
+
+my username is `peterthoeny`
+
+------------------------------
+
+change README to have just the title, one sentence what it is, and `See [../README.md](../README.md)`
+
+update the server section in the project README as needed (for example, there is only one git pull)
+
+------------------------------
+
+web-ide-bridge-server.js is not complete, it stops at checkRateLimit()​
+
+------------------------------
+
+before we go to browser tier, recommend unit test structure, and generate unit test files for server/. update also the project README accordingly.
+
+------------------------------
+
+what is better, have all tests in the tests/ directory with tests/server/, or as you listed server/tests/ ?
+
+------------------------------
+
+I am not clear now on the new files, please elaborate with file content
+
+------------------------------
+
+is project README updated for running the tests?
+
+------------------------------
+
+before we go to the next tier, review one more time the server code, and test coverage. modify as needed
+
+------------------------------
+
+(NOTE: start new chat)
+
+Web-IDE-Bridge implementation
+
+------------------------------
+
+(followed by pasting each file, path and content; one by one)
+
+------------------------------
+
+review the server/ code and the existing test infra. improve as needed. for example, tests/server/edge-cases.test.js is incomplete.
+
+consider yourself an experienced full stack coder developer with 10+ years of experience.
+
+------------------------------
+
+(after some debug sessions to get server running)
+
+now the server starts properly.
+
+- add `/web-ide-bridge/status` and `/web-ide-bridge/debug` URIs to `.conf` file
+- change `/web-ide-bridge/status` to a simple HTML page with simple style in generated HTML, e.g. no JSON output
+- redirect `/` to `/web-ide-bridge/status` (or serve at `/`?)
+
+------------------------------
+
+review project README and enhance as needed. for example, tests/ in Project Structure is incomplete.
+
+also, default debug flag in server/web-ide-bridge-server.conf should be true.
+
+------------------------------
+
+```$ npm install
+$ npm run test:server
+
+> web-ide-bridge@0.1.3 test:server
+> jest tests/server
+
+(node:12462) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 uncaughtException listeners added to [process]. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Web-IDE-Bridge server v0.1.3 running on localhost:0".
+
+      356 |     }
+      357 |   }
+    > 358 |
+          | ^
+      359 |   /**
+      360 |    * Set up Express application with middleware
+      361 |    */
+
+      at console.log (node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at Server.<anonymous> (server/web-ide-bridge-server.js:358:17)```
+
+------------------------------
+
+going forward, provide the file name for each updated file.
+
+(followed by a number of debug sessions to fix tests)
+
+------------------------------
+
+I'll paste some code, just listen until further instructed
+
+------------------------------
+
+next task: looking at project README and developer context files, implement `browser/`. for `demo.html` use a matching style to server status page. (one I give the go ahead)
+
+------------------------------
+
+in server log I see this when pushing "Connect to Server" button:
+```
+127.0.0.1 - - [22/Jul/2025:19:47:49 +0000] "GET /web-ide-bridge/status HTTP/1.1" 200 - "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0"
+New WebSocket connection: e6d5ab59-14b5-47d9-95b0-478015739d13 from 127.0.0.1
+Error: Invalid connectionId: does not match connection (connection: e6d5ab59-14b5-47d9-95b0-478015739d13)
+127.0.0.1 - - [22/Jul/2025:19:48:20 +0000] "GET /web-ide-bridge/status HTTP/1.1" 200 - "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0"
+Error: Invalid connectionId: does not match connection (connection: e6d5ab59-14b5-47d9-95b0-478015739d13)```
+
+------------------------------
+
+now I get this on the server:
+```New WebSocket connection: fb99e773-ff05-44f7-97bc-2c8b382301f4 from 127.0.0.1
+127.0.0.1 - - [22/Jul/2025:19:55:32 +0000] "GET /web-ide-bridge/status HTTP/1.1" 200 - "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0"
+Error: Invalid connectionId: does not match connection (connection: fb99e773-ff05-44f7-97bc-2c8b382301f4)
+```
+and this in the browser demo log:
+```
+Ready to connect to Web-IDE-Bridge server...
+[12:55:08 PM] Demo page loaded. Ready to connect!
+[12:55:13 PM] Attempting to connect to server...
+[12:55:13 PM] Using user ID: demo-user-mimls0h09
+[12:55:13 PM] Connection status changed: disconnected
+[12:55:13 PM] Connection status changed: connecting
+[12:55:13 PM] Connection status changed: connected
+[12:55:13 PM] Successfully connected to Web-IDE-Bridge server!
+[12:55:13 PM] Error: Failed to parse server message
+[12:55:44 PM] Error: Invalid connectionId: does not match connection
+[12:56:14 PM] Error: Invalid connectionId: does not match connection```
+
+------------------------------
+
+server log now ok. browser demo log:
+```
+Ready to connect to Web-IDE-Bridge server...
+[1:06:22 PM] Demo page loaded. Ready to connect!
+[1:06:37 PM] Attempting to connect to server...
+[1:06:37 PM] Using user ID: demo-user-tqbt6tqwa
+[1:06:37 PM] Connection status changed: disconnected
+[1:06:37 PM] Connection status changed: connecting
+[1:06:37 PM] Connection status changed: connected
+[1:06:37 PM] Successfully connected to Web-IDE-Bridge server!
+[1:06:37 PM] Error: Failed to parse server message: this._handleConnectionInit is not a function
+```
+
+------------------------------
