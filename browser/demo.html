@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-IDE-Bridge Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2rem;
+            max-width: 1200px;
+            width: 90%;
+            margin: 0 auto 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #f3f4f6;
+            padding-bottom: 1.5rem;
+        }
+        
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .version {
+            background: #4f46e5;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background-color: #f59e0b;
+            transition: background-color 0.3s ease;
+        }
+        
+        .connection-status.connected {
+            background-color: #10b981;
+        }
+        
+        .connection-status.connecting {
+            background-color: #3b82f6;
+        }
+        
+        .connection-status.disconnected {
+            background-color: #ef4444;
+        }
+        
+        .demo-section {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-description {
+            color: #6b7280;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .code-container {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+        
+        .code-label {
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .code-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+        
+        .code-textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .edit-controls {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            align-items: center;
+        }
+        
+        .edit-in-ide-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .edit-in-ide-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        
+        .edit-in-ide-btn:active {
+            transform: translateY(0);
+        }
+        
+        .edit-in-ide-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .file-type-select {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: white;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #6b7280;
+        }
+        
+        .status-dot.connected {
+            background: #10b981;
+        }
+        
+        .status-dot.connecting {
+            background: #3b82f6;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.disconnected {
+            background: #ef4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .footer a {
+            color: #4f46e5;
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .instructions {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .instructions h3 {
+            color: #1e40af;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .instructions ol {
+            color: #1e40af;
+            padding-left: 1.25rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .instructions li {
+            margin-bottom: 0.25rem;
+        }
+        
+        .log-container {
+            background: #111827;
+            color: #f3f4f6;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 0.75rem;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.25rem;
+            opacity: 0.8;
+        }
+        
+        .log-entry.error {
+            color: #fca5a5;
+        }
+        
+        .log-entry.success {
+            color: #86efac;
+        }
+        
+        .log-entry.info {
+            color: #93c5fd;
+        }
+        
+        .connect-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .connect-btn:hover {
+            background: #059669;
+        }
+        
+        .connect-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .disconnect-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .disconnect-btn:hover {
+            background: #dc2626;
+        }
+        
+        .disconnect-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .server-url-input {
+            margin-left: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            width: 300px;
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .title {
+                font-size: 1.5rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .edit-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Web-IDE-Bridge Demo</h1>
+            <p class="subtitle">Experience seamless code editing between web applications and desktop IDEs</p>
+            <span class="version">v0.1.3</span>
+            <div class="connection-status" id="connectionStatus">disconnected</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>🚀 Getting Started</h3>
+            <ol>
+                <li>Start the Web-IDE-Bridge server: <code>npm start</code> in the server directory</li>
+                <li>Launch the Web-IDE-Bridge desktop application</li>
+                <li>Click "Connect to Server" below to establish the connection</li>
+                <li>Click "Edit in IDE ↗" next to any textarea to open it in your preferred IDE</li>
+                <li>Make changes in your IDE and save (Ctrl+S/Cmd+S) to see them sync back instantly</li>
+            </ol>
+        </div>
+        
+        <div class="demo-section">
+            <h2 class="section-title">🔗 Connection Management</h2>
+            <p class="section-description">
+                Connect to the Web-IDE-Bridge server to enable IDE integration.
+            </p>
+            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                <button id="connectBtn" class="connect-btn" onclick="connectToServer()">Connect to Server</button>
+                <button id="disconnectBtn" class="disconnect-btn" onclick="disconnectFromServer()" disabled>Disconnect</button>
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </div>
+            <div>
+                <label for="serverUrl">Server URL:</label>
+                <input type="text" id="serverUrl" class="server-url-input" value="ws://localhost:8071/web-ide-bridge/ws">
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="demo-section">
+                <h2 class="section-title">📝 JavaScript Code</h2>
+                <p class="section-description">
+                    Try editing this JavaScript function in your IDE with full IntelliSense and syntax highlighting.
+                </p>
+                
+                <div class="code-container">
+                    <label class="code-label" for="jsCode">Function Implementation:</label>
+                    <textarea class="code-textarea" id="jsCode" data-language="javascript">// Web-IDE-Bridge Demo - JavaScript
+function calculateFibonacci(n) {
+    if (n <= 1) {
+        return n;
+    }
+    
+    let a = 0, b = 1;
+    for (let i = 2; i <= n; i++) {
+        const temp = a + b;
+        a = b;
+        b = temp;
+    }
+    
+    return b;
+}
+
+// Test the function
+console.log('Fibonacci sequence:');
+for (let i = 0; i < 10; i++) {
+    console.log(`F(${i}) = ${calculateFibonacci(i)}`);
+}</textarea>
+                    
+                    <div class="edit-controls">
+                        <button class="edit-in-ide-btn" data-textarea-id="jsCode" data-file-type="js">
+                            📝 Edit in IDE ↗
+                        </button>
+                        <select class="file-type-select" data-for="jsCode">
+                            <option value="js">JavaScript (.js)</option>
+                            <option value="ts">TypeScript (.ts)</option>
+                            <option value="jsx">React JSX (.jsx)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-section">
+                <h2 class="section-title">🎨 CSS Styles</h2>
+                <p class="section-description">
+                    Edit CSS with full autocomplete, color previews, and advanced formatting features.
+                </p>
+                
+                <div class="code-container">
+                    <label class="code-label" for="cssCode">Stylesheet:</label>
+                    <textarea class="code-textarea" id="cssCode" data-language="css">/* Web-IDE-Bridge Demo - CSS */
+.demo-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1rem 0;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    color: white;
+    transition: transform 0.3s ease;
+}
+
+.demo-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.demo-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.demo-card p {
+    opacity: 0.9;
+    line-height: 1.6;
+}</textarea>
+                    
+                    <div class="edit-controls">
+                        <button class="edit-in-ide-btn" data-textarea-id="cssCode" data-file-type="css">
+                            🎨 Edit in IDE ↗
+                        </button>
+                        <select class="file-type-select" data-for="cssCode">
+                            <option value="css">CSS (.css)</option>
+                            <option value="scss">SCSS (.scss)</option>
+                            <option value="less">Less (.less)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-section">
+                <h2 class="section-title">🐍 Python Script</h2>
+                <p class="section-description">
+                    Python code with intelligent code completion, debugging support, and linting.
+                </p>
+                
+                <div class="code-container">
+                    <label class="code-label" for="pythonCode">Data Analysis Script:</label>
+                    <textarea class="code-textarea" id="pythonCode" data-language="python"># Web-IDE-Bridge Demo - Python
+import matplotlib.pyplot as plt
+import numpy as np
+
+def generate_sample_data():
+    """Generate sample data for visualization."""
+    x = np.linspace(0, 10, 100)
+    y1 = np.sin(x)
+    y2 = np.cos(x)
+    y3 = np.sin(x) * np.cos(x)
+    
+    return x, y1, y2, y3
+
+def create_plot():
+    """Create a beautiful multi-line plot."""
+    x, y1, y2, y3 = generate_sample_data()
+    
+    plt.figure(figsize=(12, 8))
+    plt.plot(x, y1, label='sin(x)', linewidth=2)
+    plt.plot(x, y2, label='cos(x)', linewidth=2)
+    plt.plot(x, y3, label='sin(x)·cos(x)', linewidth=2)
+    
+    plt.title('Trigonometric Functions', fontsize=16)
+    plt.xlabel('x', fontsize=12)
+    plt.ylabel('y', fontsize=12)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+if __name__ == "__main__":
+    create_plot()</textarea>
+                    
+                    <div class="edit-controls">
+                        <button class="edit-in-ide-btn" data-textarea-id="pythonCode" data-file-type="py">
+                            🐍 Edit in IDE ↗
+                        </button>
+                        <select class="file-type-select" data-for="pythonCode">
+                            <option value="py">Python (.py)</option>
+                            <option value="pyw">Python Windows (.pyw)</option>
+                            <option value="ipynb">Jupyter Notebook (.ipynb)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-section">
+                <h2 class="section-title">📄 HTML Template</h2>
+                <p class="section-description">
+                    HTML editing with tag completion, attribute suggestions, and live validation.
+                </p>
+                
+                <div class="code-container">
+                    <label class="code-label" for="htmlCode">Component Template:</label>
+                    <textarea class="code-textarea" id="htmlCode" data-language="html"><!-- Web-IDE-Bridge Demo - HTML -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Component</title>
+    <style>
+        .component {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .component h2 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+        }
+        
+        .component p {
+            color: #4a5568;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="component">
+        <h2>Sample Component</h2>
+        <p>This is a demo component created with Web-IDE-Bridge. 
+           Edit this HTML in your favorite IDE with full tag completion 
+           and syntax highlighting.</p>
+        
+        <button onclick="alert('Hello from Web-IDE-Bridge!')">
+            Click Me
+        </button>
+    </div>
+</body>
+</html></textarea>
+                    
+                    <div class="edit-controls">
+                        <button class="edit-in-ide-btn" data-textarea-id="htmlCode" data-file-type="html">
+                            📄 Edit in IDE ↗
+                        </button>
+                        <select class="file-type-select" data-for="htmlCode">
+                            <option value="html">HTML (.html)</option>
+                            <option value="htm">HTML (.htm)</option>
+                            <option value="xhtml">XHTML (.xhtml)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2 class="section-title">📊 Activity Log</h2>
+            <p class="section-description">
+                Real-time log of Web-IDE-Bridge activities and connection status.
+            </p>
+            <div class="log-container" id="activityLog">
+                <div class="log-entry info">Ready to connect to Web-IDE-Bridge server...</div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <a href="/web-ide-bridge/status">Server Status</a>
+                <a href="https://github.com/peterthoeny/web-ide-bridge">GitHub</a>
+                <a href="../README.md">Documentation</a>
+            </p>
+            <p style="margin-top: 0.5rem;">
+                Web-IDE-Bridge Demo - Bridge web applications to desktop IDEs
+            </p>
+        </div>
+    </div>
+    
+    <!-- Include the Web-IDE-Bridge library -->
+    <script src="web-ide-bridge.js"></script>
+    
+    <script>
+        // Global variables
+        let webIdeBridge = null;
+        let isConnected = false;
+        
+        // DOM elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const activityLog = document.getElementById('activityLog');
+        
+        // Utility functions
+        function logActivity(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            activityLog.appendChild(logEntry);
+            activityLog.scrollTop = activityLog.scrollHeight;
+            
+            // Keep only last 50 log entries
+            while (activityLog.children.length > 50) {
+                activityLog.removeChild(activityLog.firstChild);
+            }
+        }
+        
+        function updateConnectionStatus(status) {
+            isConnected = status === 'connected';
+            
+            connectionStatus.className = `connection-status ${status}`;
+            connectionStatus.textContent = status;
+            
+            statusDot.className = `status-dot ${status}`;
+            statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            
+            connectBtn.disabled = isConnected;
+            disconnectBtn.disabled = !isConnected;
+            
+            // Update all edit buttons
+            document.querySelectorAll('.edit-in-ide-btn').forEach(btn => {
+                btn.disabled = !isConnected;
+            });
+        }
+        
+        function generateUserId() {
+            return 'demo-user-' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // Connection functions
+        async function connectToServer() {
+            try {
+                updateConnectionStatus('connecting');
+                logActivity('Attempting to connect to server...', 'info');
+                
+                const serverUrl = serverUrlInput.value.trim();
+                if (!serverUrl) {
+                    throw new Error('Server URL is required');
+                }
+                
+                const userId = generateUserId();
+                logActivity(`Using user ID: ${userId}`, 'info');
+                
+                // Initialize Web-IDE-Bridge
+                webIdeBridge = new WebIdeBridge(userId, {
+                    serverUrl: serverUrl,
+                    debug: true
+                });
+                
+                // Set up event handlers
+                webIdeBridge.onStatusChange((status) => {
+                    updateConnectionStatus(status);
+                    logActivity(`Connection status changed: ${status}`, status === 'connected' ? 'success' : 'info');
+                });
+                
+                webIdeBridge.onCodeUpdate((textareaId, updatedCode) => {
+                    const textarea = document.getElementById(textareaId);
+                    if (textarea) {
+                        textarea.value = updatedCode;
+                        logActivity(`Code updated for ${textareaId}`, 'success');
+                        
+                        // Trigger change event for any listeners
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+                
+                webIdeBridge.onError((error) => {
+                    logActivity(`Error: ${error}`, 'error');
+                });
+                
+                // Connect to server
+                await webIdeBridge.connect();
+                logActivity('Successfully connected to Web-IDE-Bridge server!', 'success');
+                
+            } catch (error) {
+                updateConnectionStatus('disconnected');
+                logActivity(`Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function disconnectFromServer() {
+            if (webIdeBridge) {
+                webIdeBridge.disconnect();
+                webIdeBridge = null;
+                updateConnectionStatus('disconnected');
+                logActivity('Disconnected from server', 'info');
+            }
+        }
+        
+        // Edit in IDE functionality
+        async function editInIDE(textareaId, fileType) {
+            if (!isConnected || !webIdeBridge) {
+                logActivity('Please connect to server first', 'error');
+                return;
+            }
+            
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) {
+                logActivity(`Textarea ${textareaId} not found`, 'error');
+                return;
+            }
+            
+            try {
+                const code = textarea.value;
+                logActivity(`Sending code to IDE: ${textareaId} (${fileType})`, 'info');
+                
+                await webIdeBridge.editCodeSnippet(textareaId, code, fileType);
+                logActivity(`Code sent to IDE successfully`, 'success');
+                
+            } catch (error) {
+                logActivity(`Failed to send code to IDE: ${error.message}`, 'error');
+            }
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up edit button handlers
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('edit-in-ide-btn')) {
+                    const textareaId = e.target.dataset.textareaId;
+                    const fileType = e.target.dataset.fileType;
+                    editInIDE(textareaId, fileType);
+                }
+            });
+            
+            // Set up file type selector handlers
+            document.querySelectorAll('.file-type-select').forEach(select => {
+                select.addEventListener('change', function() {
+                    const textareaId = this.dataset.for;
+                    const fileType = this.value;
+                    const button = document.querySelector(`[data-textarea-id="${textareaId}"]`);
+                    if (button) {
+                        button.dataset.fileType = fileType;
+                    }
+                });
+            });
+            
+            // Initialize connection status
+            updateConnectionStatus('disconnected');
+            logActivity('Demo page loaded. Ready to connect!', 'info');
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Shift+E / Cmd+Shift+E to connect
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+                e.preventDefault();
+                if (!isConnected) {
+                    connectToServer();
+                }
+            }
+            
+            // Escape to disconnect
+            if (e.key === 'Escape' && isConnected) {
+                disconnectFromServer();
+            }
+        });
+        
+        // Auto-reconnect on page visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && webIdeBridge && !isConnected) {
+                logActivity('Page became visible, attempting to reconnect...', 'info');
+                connectToServer();
+            }
+        });
+    </script>
+</body>
+</html>

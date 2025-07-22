@@ -1,0 +1,885 @@
+/**
+ * Web-IDE-Bridge v0.1.3
+ * Browser library for seamless IDE integration
+ * 
+ * This is the development build with full debugging support.
+ * For production, use web-ide-bridge.min.js
+ */
+
+(function (global, factory) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+  typeof define === 'function' && define.amd ? define(factory) :
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.WebIdeBridge = factory());
+})(this, (function () { 'use strict';
+
+  /**
+   * Generate a UUID v4
+   */
+  function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * Validate WebSocket server URL
+   */
+  function validateServerUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+    
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'ws:' || urlObj.protocol === 'wss:';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Debounce function calls
+   */
+  function debounce(func, wait, immediate = false) {
+    let timeout;
+    
+    return function executedFunction(...args) {
+      const later = () => {
+        timeout = null;
+        if (!immediate) func.apply(this, args);
+      };
+      
+      const callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      
+      if (callNow) func.apply(this, args);
+    };
+  }
+
+  /**
+   * UI Manager for Web-IDE-Bridge
+   * Handles automatic button injection and UI interactions
+   */
+  class UIManager {
+    constructor(webIdeBridge) {
+      this.webIdeBridge = webIdeBridge;
+      this.injectedButtons = new Map();
+      this.observers = [];
+      this.styles = null;
+      this.initialized = false;
+    }
+
+    autoInjectButtons(options = {}) {
+      const defaultOptions = {
+        selector: 'textarea',
+        buttonText: 'Edit in IDE ↗',
+        buttonClass: 'web-ide-bridge-btn',
+        position: 'after',
+        fileTypeAttribute: 'data-language',
+        defaultFileType: 'txt',
+        excludeSelector: '.web-ide-bridge-exclude',
+        includeOnlySelector: null,
+        watchForChanges: true,
+        style: 'modern'
+      };
+
+      const config = { ...defaultOptions, ...options };
+      
+      this._initializeStyles(config.style);
+      this._injectButtonsForSelector(config);
+      
+      if (config.watchForChanges) {
+        this._watchForDOMChanges(config);
+      }
+
+      return {
+        refresh: () => this._injectButtonsForSelector(config),
+        destroy: () => this.removeAllButtons()
+      };
+    }
+
+    injectButton(textareaElement, options = {}) {
+      if (!textareaElement || textareaElement.tagName !== 'TEXTAREA') {
+        throw new Error('Element must be a textarea');
+      }
+
+      const defaultOptions = {
+        buttonText: 'Edit in IDE ↗',
+        buttonClass: 'web-ide-bridge-btn',
+        position: 'after',
+        fileType: 'txt',
+        style: 'modern'
+      };
+
+      const config = { ...defaultOptions, ...options };
+      
+      this._initializeStyles(config.style);
+      
+      if (!textareaElement.id) {
+        textareaElement.id = 'web-ide-bridge-textarea-' + generateUUID();
+      }
+
+      return this._createAndInjectButton(textareaElement, config);
+    }
+
+    removeAllButtons() {
+      this.injectedButtons.forEach(button => {
+        if (button.parentNode) {
+          button.parentNode.removeChild(button);
+        }
+      });
+      this.injectedButtons.clear();
+      
+      this.observers.forEach(observer => observer.disconnect());
+      this.observers = [];
+      
+      if (this.styles && this.styles.parentNode) {
+        this.styles.parentNode.removeChild(this.styles);
+        this.styles = null;
+      }
+    }
+
+    updateButtonStates(connected) {
+      this.injectedButtons.forEach(button => {
+        button.disabled = !connected;
+        button.textContent = connected ? 
+          button.dataset.originalText : 
+          'Connect to Server First';
+      });
+    }
+
+    _initializeStyles(style) {
+      if (this.styles || this.initialized) return;
+      
+      const styleElement = document.createElement('style');
+      styleElement.id = 'web-ide-bridge-styles';
+      
+      let css = '';
+      
+      switch (style) {
+        case 'modern':
+          css = this._getModernButtonStyles();
+          break;
+        case 'minimal':
+          css = this._getMinimalButtonStyles();
+          break;
+        default:
+          css = this._getModernButtonStyles();
+      }
+      
+      styleElement.textContent = css;
+      document.head.appendChild(styleElement);
+      this.styles = styleElement;
+      this.initialized = true;
+    }
+
+    _getModernButtonStyles() {
+      return `
+        .web-ide-bridge-btn {
+          background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+          color: white;
+          border: none;
+          padding: 0.75rem 1.5rem;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin: 0.5rem 0;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          text-decoration: none;
+          outline: none;
+        }
+        
+        .web-ide-bridge-btn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        
+        .web-ide-bridge-btn:active:not(:disabled) {
+          transform: translateY(0);
+        }
+        
+        .web-ide-bridge-btn:disabled {
+          background: #9ca3af;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+        
+        .web-ide-bridge-btn:focus {
+          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+        }
+        
+        .web-ide-bridge-container {
+          display: flex;
+          gap: 0.75rem;
+          align-items: center;
+          margin-top: 0.5rem;
+          flex-wrap: wrap;
+        }
+        
+        .web-ide-bridge-file-type {
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 0.875rem;
+          background: white;
+          color: #374151;
+        }
+      `;
+    }
+
+    _getMinimalButtonStyles() {
+      return `
+        .web-ide-bridge-btn {
+          background: #4f46e5;
+          color: white;
+          border: 1px solid #4f46e5;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+          font-family: inherit;
+          outline: none;
+        }
+        
+        .web-ide-bridge-btn:hover:not(:disabled) {
+          background: #4338ca;
+        }
+        
+        .web-ide-bridge-btn:disabled {
+          background: #9ca3af;
+          border-color: #9ca3af;
+          cursor: not-allowed;
+        }
+        
+        .web-ide-bridge-btn:focus {
+          box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+        }
+        
+        .web-ide-bridge-container {
+          margin-top: 0.5rem;
+        }
+        
+        .web-ide-bridge-file-type {
+          margin-left: 0.5rem;
+          padding: 0.25rem 0.5rem;
+          border: 1px solid #ccc;
+          border-radius: 3px;
+          font-size: 0.8rem;
+        }
+      `;
+    }
+
+    _injectButtonsForSelector(config) {
+      let elements = document.querySelectorAll(config.selector);
+      
+      elements = Array.from(elements).filter(element => {
+        if (config.excludeSelector && element.matches(config.excludeSelector)) {
+          return false;
+        }
+        if (config.includeOnlySelector && !element.matches(config.includeOnlySelector)) {
+          return false;
+        }
+        return true;
+      });
+
+      elements.forEach(textarea => {
+        if (!textarea.id) {
+          textarea.id = 'web-ide-bridge-textarea-' + generateUUID();
+        }
+        
+        if (this.injectedButtons.has(textarea.id)) {
+          return;
+        }
+
+        const fileType = textarea.getAttribute(config.fileTypeAttribute) || config.defaultFileType;
+        
+        this._createAndInjectButton(textarea, {
+          ...config,
+          fileType
+        });
+      });
+    }
+
+    _createAndInjectButton(textarea, config) {
+      const container = document.createElement('div');
+      container.className = 'web-ide-bridge-container';
+      
+      const button = document.createElement('button');
+      button.className = config.buttonClass;
+      button.textContent = config.buttonText;
+      button.dataset.textareaId = textarea.id;
+      button.dataset.fileType = config.fileType;
+      button.dataset.originalText = config.buttonText;
+      button.disabled = !this.webIdeBridge.isConnected();
+      
+      const fileTypeSelect = document.createElement('select');
+      fileTypeSelect.className = 'web-ide-bridge-file-type';
+      fileTypeSelect.value = config.fileType;
+      
+      const fileTypes = [
+        { value: 'txt', label: 'Text (.txt)' },
+        { value: 'js', label: 'JavaScript (.js)' },
+        { value: 'ts', label: 'TypeScript (.ts)' },
+        { value: 'jsx', label: 'React JSX (.jsx)' },
+        { value: 'tsx', label: 'React TSX (.tsx)' },
+        { value: 'css', label: 'CSS (.css)' },
+        { value: 'scss', label: 'SCSS (.scss)' },
+        { value: 'less', label: 'Less (.less)' },
+        { value: 'html', label: 'HTML (.html)' },
+        { value: 'xml', label: 'XML (.xml)' },
+        { value: 'json', label: 'JSON (.json)' },
+        { value: 'yaml', label: 'YAML (.yaml)' },
+        { value: 'py', label: 'Python (.py)' },
+        { value: 'java', label: 'Java (.java)' },
+        { value: 'cpp', label: 'C++ (.cpp)' },
+        { value: 'c', label: 'C (.c)' },
+        { value: 'php', label: 'PHP (.php)' },
+        { value: 'rb', label: 'Ruby (.rb)' },
+        { value: 'go', label: 'Go (.go)' },
+        { value: 'rs', label: 'Rust (.rs)' },
+        { value: 'sh', label: 'Shell (.sh)' },
+        { value: 'sql', label: 'SQL (.sql)' },
+        { value: 'md', label: 'Markdown (.md)' }
+      ];
+      
+      fileTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type.value;
+        option.textContent = type.label;
+        fileTypeSelect.appendChild(option);
+      });
+      
+      fileTypeSelect.addEventListener('change', () => {
+        button.dataset.fileType = fileTypeSelect.value;
+      });
+      
+      button.addEventListener('click', async () => {
+        if (!this.webIdeBridge.isConnected()) {
+          alert('Please connect to Web-IDE-Bridge server first');
+          return;
+        }
+        
+        try {
+          const code = textarea.value;
+          const fileType = button.dataset.fileType;
+          await this.webIdeBridge.editCodeSnippet(textarea.id, code, fileType);
+        } catch (error) {
+          console.error('Failed to send code to IDE:', error);
+          alert('Failed to send code to IDE: ' + error.message);
+        }
+      });
+      
+      container.appendChild(button);
+      container.appendChild(fileTypeSelect);
+      
+      switch (config.position) {
+        case 'before':
+          textarea.parentNode.insertBefore(container, textarea);
+          break;
+        case 'after':
+          textarea.parentNode.insertBefore(container, textarea.nextSibling);
+          break;
+        case 'append':
+          textarea.parentNode.appendChild(container);
+          break;
+        default:
+          textarea.parentNode.insertBefore(container, textarea.nextSibling);
+      }
+      
+      this.injectedButtons.set(textarea.id, button);
+      
+      this.webIdeBridge.onStatusChange((status) => {
+        this.updateButtonStates(status === 'connected');
+      });
+      
+      return button;
+    }
+
+    _watchForDOMChanges(config) {
+      const observer = new MutationObserver((mutations) => {
+        let shouldRefresh = false;
+        
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach((node) => {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.matches && node.matches(config.selector)) {
+                  shouldRefresh = true;
+                } else if (node.querySelector && node.querySelector(config.selector)) {
+                  shouldRefresh = true;
+                }
+              }
+            });
+          }
+        });
+        
+        if (shouldRefresh) {
+          setTimeout(() => {
+            this._injectButtonsForSelector(config);
+          }, 100);
+        }
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+      
+      this.observers.push(observer);
+    }
+  }
+
+  /**
+   * Web-IDE-Bridge Client Library
+   * Provides seamless integration between web applications and desktop IDEs
+   */
+  class WebIdeBridge {
+    constructor(userId, options = {}) {
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('userId is required and must be a string');
+      }
+
+      this.userId = userId;
+      this.connectionId = generateUUID();
+      this.options = {
+        serverUrl: 'ws://localhost:8071/web-ide-bridge/ws',
+        autoReconnect: true,
+        reconnectInterval: 5000,
+        maxReconnectAttempts: 10,
+        heartbeatInterval: 30000,
+        connectionTimeout: 10000,
+        debug: false,
+        ...options
+      };
+
+      if (!validateServerUrl(this.options.serverUrl)) {
+        throw new Error('Invalid server URL format');
+      }
+
+      this.ws = null;
+      this.connected = false;
+      this.connecting = false;
+      this.reconnectAttempts = 0;
+      this.reconnectTimeout = null;
+      this.heartbeatTimeout = null;
+      this.connectionTimeout = null;
+
+      this.statusCallbacks = [];
+      this.codeUpdateCallbacks = [];
+      this.errorCallbacks = [];
+      this.messageCallbacks = [];
+
+      this.uiManager = new UIManager(this);
+      this.debouncedReconnect = debounce(this._attemptReconnect.bind(this), 1000);
+
+      this._log('WebIdeBridge initialized', { userId, connectionId: this.connectionId });
+    }
+
+    async connect() {
+      if (this.connected || this.connecting) {
+        this._log('Already connected or connecting');
+        return;
+      }
+
+      this.connecting = true;
+      this._updateStatus('connecting');
+
+      try {
+        await this._establishConnection();
+        this.reconnectAttempts = 0;
+        this._log('Successfully connected to server');
+      } catch (error) {
+        this.connecting = false;
+        this._handleConnectionError(error);
+        throw error;
+      }
+    }
+
+    disconnect() {
+      this._log('Disconnecting from server');
+      
+      this._clearTimeouts();
+      this.options.autoReconnect = false;
+      
+      if (this.ws) {
+        this.ws.close(1000, 'Client disconnect');
+        this.ws = null;
+      }
+      
+      this.connected = false;
+      this.connecting = false;
+      this._updateStatus('disconnected');
+    }
+
+    isConnected() {
+      return this.connected;
+    }
+
+    getConnectionState() {
+      if (this.connected) return 'connected';
+      if (this.connecting) return 'connecting';
+      return 'disconnected';
+    }
+
+    async editCodeSnippet(textareaId, code, fileType = 'txt') {
+      if (!this.connected) {
+        throw new Error('Not connected to server');
+      }
+
+      if (!textareaId || typeof textareaId !== 'string') {
+        throw new Error('textareaId is required and must be a string');
+      }
+
+      if (typeof code !== 'string') {
+        throw new Error('code must be a string');
+      }
+
+      const sessionId = generateUUID();
+      
+      const message = {
+        type: 'edit_request',
+        connectionId: this.connectionId,
+        userId: this.userId,
+        sessionId,
+        payload: {
+          textareaId,
+          code,
+          fileType: fileType || 'txt',
+          timestamp: Date.now()
+        }
+      };
+
+      this._log('Sending edit request', { textareaId, fileType, sessionId });
+      this._sendMessage(message);
+      
+      return sessionId;
+    }
+
+    onStatusChange(callback) {
+      if (typeof callback !== 'function') {
+        throw new Error('Callback must be a function');
+      }
+      this.statusCallbacks.push(callback);
+      callback(this.getConnectionState());
+    }
+
+    onCodeUpdate(callback) {
+      if (typeof callback !== 'function') {
+        throw new Error('Callback must be a function');
+      }
+      this.codeUpdateCallbacks.push(callback);
+    }
+
+    onError(callback) {
+      if (typeof callback !== 'function') {
+        throw new Error('Callback must be a function');
+      }
+      this.errorCallbacks.push(callback);
+    }
+
+    autoInjectButtons(options = {}) {
+      return this.uiManager.autoInjectButtons(options);
+    }
+
+    injectButton(textareaElement, options = {}) {
+      return this.uiManager.injectButton(textareaElement, options);
+    }
+
+    // Private methods
+
+    async _establishConnection() {
+      return new Promise((resolve, reject) => {
+        try {
+          this._log('Establishing WebSocket connection', { url: this.options.serverUrl });
+          
+          this.ws = new WebSocket(this.options.serverUrl);
+          
+          this.connectionTimeout = setTimeout(() => {
+            if (this.ws.readyState !== WebSocket.OPEN) {
+              this.ws.close();
+              reject(new Error('Connection timeout'));
+            }
+          }, this.options.connectionTimeout);
+
+          this.ws.onopen = () => {
+            clearTimeout(this.connectionTimeout);
+            this._log('WebSocket connection opened');
+            this._handleConnectionOpen();
+            resolve();
+          };
+
+          this.ws.onmessage = (event) => {
+            this._handleMessage(event);
+          };
+
+          this.ws.onclose = (event) => {
+            this._handleConnectionClose(event);
+          };
+
+          this.ws.onerror = (error) => {
+            clearTimeout(this.connectionTimeout);
+            this._log('WebSocket error', error);
+            reject(new Error('WebSocket connection failed'));
+          };
+
+        } catch (error) {
+          clearTimeout(this.connectionTimeout);
+          reject(error);
+        }
+      });
+    }
+
+    _handleConnectionOpen() {
+      this.connected = true;
+      this.connecting = false;
+      this._updateStatus('connected');
+    }
+
+    _handleConnectionClose(event) {
+      this._log('WebSocket connection closed', { code: event.code, reason: event.reason });
+      
+      this.connected = false;
+      this.connecting = false;
+      this._clearTimeouts();
+      this._updateStatus('disconnected');
+      
+      if (this.options.autoReconnect && event.code !== 1000) {
+        this._scheduleReconnect();
+      }
+    }
+
+    _handleConnectionError(error) {
+      this._log('Connection error', error);
+      this._triggerErrorCallbacks(error.message || 'Connection failed');
+      
+      if (this.options.autoReconnect) {
+        this._scheduleReconnect();
+      }
+    }
+
+    _handleMessage(event) {
+      try {
+        const message = JSON.parse(event.data);
+        this._log('Received message', message);
+        
+        this.messageCallbacks.forEach(callback => {
+          try {
+            callback(message);
+          } catch (error) {
+            this._log('Error in message callback', error);
+          }
+        });
+        
+        switch (message.type) {
+          case 'connection_init':
+            this._handleConnectionInit(message);
+            break;
+            
+          case 'connection_ack':
+            this._log('Connection acknowledged by server');
+            break;
+            
+          case 'code_update':
+            this._handleCodeUpdate(message);
+            break;
+            
+          case 'pong':
+            this._log('Received pong from server');
+            break;
+            
+          case 'error':
+            this._handleServerError(message);
+            break;
+            
+          default:
+            this._log('Unknown message type', message.type);
+        }
+        
+      } catch (error) {
+        this._log('Error parsing message', error);
+        this._log('Raw message data', event.data);
+        this._triggerErrorCallbacks('Failed to parse server message: ' + error.message);
+      }
+    }
+
+    _handleConnectionInit(message) {
+      if (message.connectionId) {
+        this.connectionId = message.connectionId;
+        this._log('Connection ID updated from server', this.connectionId);
+        
+        const connectMessage = {
+          type: 'browser_connect',
+          connectionId: this.connectionId,
+          userId: this.userId,
+          timestamp: Date.now()
+        };
+        
+        this._sendMessage(connectMessage);
+        this._startHeartbeat();
+      }
+    }
+
+    _handleCodeUpdate(message) {
+      if (!message.payload || !message.payload.textareaId) {
+        this._log('Invalid code update message', message);
+        return;
+      }
+
+      const { textareaId, code } = message.payload;
+      this._log('Received code update', { textareaId, codeLength: code.length });
+      
+      this.codeUpdateCallbacks.forEach(callback => {
+        try {
+          callback(textareaId, code);
+        } catch (error) {
+          this._log('Error in code update callback', error);
+        }
+      });
+    }
+
+    _handleServerError(message) {
+      const errorMsg = message.payload?.message || 'Unknown server error';
+      this._log('Server error', errorMsg);
+      this._triggerErrorCallbacks(errorMsg);
+    }
+
+    _sendMessage(message) {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error('WebSocket not connected');
+      }
+
+      try {
+        this.ws.send(JSON.stringify(message));
+        this._log('Sent message', message);
+      } catch (error) {
+        this._log('Error sending message', error);
+        throw new Error('Failed to send message to server');
+      }
+    }
+
+    _startHeartbeat() {
+      this._clearHeartbeat();
+      
+      if (this.options.heartbeatInterval > 0) {
+        this.heartbeatTimeout = setTimeout(() => {
+          if (this.connected) {
+            try {
+              this._sendMessage({
+                type: 'ping',
+                connectionId: this.connectionId,
+                timestamp: Date.now()
+              });
+              this._startHeartbeat();
+            } catch (error) {
+              this._log('Heartbeat failed', error);
+            }
+          }
+        }, this.options.heartbeatInterval);
+      }
+    }
+
+    _clearHeartbeat() {
+      if (this.heartbeatTimeout) {
+        clearTimeout(this.heartbeatTimeout);
+        this.heartbeatTimeout = null;
+      }
+    }
+
+    _scheduleReconnect() {
+      if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
+        this._log('Max reconnect attempts reached');
+        this._triggerErrorCallbacks('Max reconnection attempts exceeded');
+        return;
+      }
+
+      const delay = Math.min(
+        this.options.reconnectInterval * Math.pow(2, this.reconnectAttempts),
+        30000
+      );
+
+      this._log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+      
+      this.reconnectTimeout = setTimeout(() => {
+        this.debouncedReconnect();
+      }, delay);
+    }
+
+    async _attemptReconnect() {
+      if (this.connected || this.connecting) {
+        return;
+      }
+
+      this.reconnectAttempts++;
+      this._log(`Reconnect attempt ${this.reconnectAttempts}`);
+      
+      try {
+        await this.connect();
+      } catch (error) {
+        this._log('Reconnect failed', error);
+        if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
+          this._scheduleReconnect();
+        }
+      }
+    }
+
+    _clearTimeouts() {
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+      
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      this._clearHeartbeat();
+    }
+
+    _updateStatus(status) {
+      this._log('Status changed to', status);
+      
+      this.statusCallbacks.forEach(callback => {
+        try {
+          callback(status);
+        } catch (error) {
+          this._log('Error in status callback', error);
+        }
+      });
+    }
+
+    _triggerErrorCallbacks(error) {
+      this.errorCallbacks.forEach(callback => {
+        try {
+          callback(error);
+        } catch (error) {
+          this._log('Error in error callback', error);
+        }
+      });
+    }
+
+    _log(message, data = null) {
+      if (this.options.debug) {
+        const logMessage = `[WebIdeBridge] ${message}`;
+        if (data) {
+          console.log(logMessage, data);
+        } else {
+          console.log(logMessage);
+        }
+      }
+    }
+  }
+
+  return WebIdeBridge;
+
+}));
