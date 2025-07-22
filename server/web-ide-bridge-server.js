@@ -1,0 +1,1598 @@
+#!/usr/bin/env node
+
+const express = require('express');
+const WebSocket = require('ws');
+const session = require('express-session');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const morgan = require('morgan');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
+/**
+ * Web-IDE-Bridge Server
+ * WebSocket relay server that bridges web applications with desktop IDEs
+ */
+class WebIdeBridgeServer {
+  constructor() {
+    this.config = this.loadConfiguration();
+    this.validateConfiguration(this.config);
+    
+    this.app = express();
+    this.server = null;
+    this.wss = null;
+    this.wsOptions = null;
+    
+    // Connection tracking
+    this.browserConnections = new Map(); // connectionId -> {ws, userId, sessionInfo}
+    this.desktopConnections = new Map(); // connectionId -> {ws, userId}
+    this.userSessions = new Map();       // userId -> {browserId, desktopId}
+    this.activeSessions = new Map();     // sessionId -> {userId, textareaId, browserConnectionId}
+    
+    // Rate limiting store
+    this.rateLimitStore = new Map();
+    
+    // Cleanup intervals
+    this.cleanupInterval = null;
+    this.heartbeatInterval = null;
+    
+    // Process event handlers (store references for cleanup)
+    this.processHandlers = {
+      uncaughtException: null,
+      unhandledRejection: null,
+      SIGTERM: null,
+      SIGINT: null
+    };
+    
+    // Metrics
+    this.metrics = {
+      totalConnections: 0,
+      activeConnections: { browser: 0, desktop: 0 },
+      totalSessions: 0,
+      messagesProcessed: 0,
+      errors: 0,
+      startTime: Date.now()
+    };
+    
+    this.setupCleanupScheduler();
+  }
+
+  /**
+   * Load configuration from file or environment variables
+   */
+  loadConfiguration() {
+    // Default configuration paths in order of preference
+    const configPaths = [
+      process.env.WEB_IDE_BRIDGE_CONFIG,
+      '/etc/web-ide-bridge-server.conf',
+      path.join(__dirname, 'web-ide-bridge-server.conf')
+    ].filter(Boolean); // Remove undefined values
+
+    let fileConfig = null;
+    let configSource = 'defaults';
+
+    // Try to load from configuration files
+    for (const configPath of configPaths) {
+      try {
+        if (fs.existsSync(configPath)) {
+          console.log(`Loading configuration from: ${configPath}`);
+          const configData = fs.readFileSync(configPath, 'utf8');
+          fileConfig = JSON.parse(configData);
+          configSource = configPath;
+          break;
+        }
+      } catch (error) {
+        console.error(`Error loading config from ${configPath}: ${error.message}`);
+        // Continue to next config path
+      }
+    }
+
+    // If no config file found, check if we should bail out
+    if (!fileConfig && process.env.NODE_ENV === 'production') {
+      console.error('No configuration file found in production environment!');
+      console.error('Checked paths:', configPaths);
+      console.error('Please create a configuration file or set WEB_IDE_BRIDGE_CONFIG environment variable');
+      process.exit(1);
+    }
+
+    // Default configuration
+    const defaultConfig = {
+      server: {
+        port: parseInt(process.env.WEB_IDE_BRIDGE_PORT) || 8071,
+        host: '0.0.0.0',
+        websocketEndpoint: '/web-ide-bridge/ws',
+        heartbeatInterval: 30000,
+        maxConnections: 1000,
+        connectionTimeout: 300000
+      },
+      endpoints: {
+        health: '/web-ide-bridge/health',
+        status: '/web-ide-bridge/status',
+        debug: '/web-ide-bridge/debug',
+        websocket: '/web-ide-bridge/ws'
+      },
+      cors: {
+        origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'https://webapp.example.com'],
+        credentials: true,
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+      },
+      session: {
+        secret: process.env.WEB_IDE_BRIDGE_SECRET || 'web-ide-bridge-secret',
+        name: 'web-ide-bridge-session',
+        cookie: {
+          maxAge: 24 * 60 * 60 * 1000,
+          secure: process.env.NODE_ENV === 'production',
+          httpOnly: true,
+          sameSite: 'lax'
+        },
+        resave: false,
+        saveUninitialized: false,
+        rolling: true
+      },
+      security: {
+        rateLimiting: {
+          enabled: process.env.NODE_ENV === 'production',
+          windowMs: 15 * 60 * 1000, // 15 minutes
+          maxRequests: 100,
+          maxWebSocketConnections: 10
+        },
+        helmet: {
+          enabled: process.env.NODE_ENV === 'production',
+          contentSecurityPolicy: false
+        }
+      },
+      logging: {
+        level: 'info',
+        format: 'combined',
+        enableAccessLog: process.env.NODE_ENV !== 'test'
+      },
+      cleanup: {
+        sessionCleanupInterval: 5 * 60 * 1000, // 5 minutes
+        maxSessionAge: 24 * 60 * 60 * 1000,    // 24 hours
+        enablePeriodicCleanup: true
+      },
+      debug: process.env.DEBUG === 'true',
+      environment: process.env.NODE_ENV || 'development'
+    };
+
+    const finalConfig = fileConfig ? this.mergeConfig(defaultConfig, fileConfig) : defaultConfig;
+    
+    console.log(`Configuration loaded from: ${configSource}`);
+    if (finalConfig.debug) {
+      console.log('Final configuration:', JSON.stringify(finalConfig, null, 2));
+    }
+
+    return finalConfig;
+  }
+
+  /**
+   * Deep merge configuration objects
+   */
+  mergeConfig(defaultConfig, fileConfig) {
+    const merged = { ...defaultConfig };
+    
+    for (const [key, value] of Object.entries(fileConfig)) {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        merged[key] = { ...merged[key], ...value };
+      } else {
+        merged[key] = value;
+      }
+    }
+    
+    return merged;
+  }
+
+  /**
+   * Validate configuration object
+   */
+  validateConfiguration(config) {
+    // Server validation
+    if (config.server.port < 0 || config.server.port > 65535) {
+      throw new Error('Server port must be between 0 and 65535');
+    }
+    
+    if (config.server.heartbeatInterval < 1000) {
+      throw new Error('Heartbeat interval must be at least 1000ms');
+    }
+    
+    if (!config.server.websocketEndpoint.startsWith('/')) {
+      throw new Error('WebSocket endpoint must start with /');
+    }
+    
+    if (config.server.maxConnections < 1) {
+      throw new Error('Max connections must be at least 1');
+    }
+    
+    if (config.server.connectionTimeout < 1000) {
+      throw new Error('Connection timeout must be at least 1000ms');
+    }
+    
+    // Session validation
+    if (config.environment === 'production') {
+      if (config.session.secret === 'web-ide-bridge-secret' || 
+          config.session.secret === 'change-this-in-production-use-env-var') {
+        throw new Error('Session secret must be changed in production');
+      }
+      
+      if (!config.session.cookie.secure) {
+        console.warn('Warning: Session cookies should be secure in production');
+      }
+    }
+    
+    if (config.session.cookie.maxAge < 60000) {
+      throw new Error('Session cookie maxAge must be at least 1 minute');
+    }
+    
+    // CORS validation
+    if (!Array.isArray(config.cors.origin)) {
+      throw new Error('CORS origin must be an array');
+    }
+    
+    // Rate limiting validation
+    if (config.security.rateLimiting.enabled) {
+      if (config.security.rateLimiting.windowMs < 1000) {
+        throw new Error('Rate limiting window must be at least 1000ms');
+      }
+      
+      if (config.security.rateLimiting.maxRequests < 1) {
+        throw new Error('Rate limiting max requests must be at least 1');
+      }
+    }
+    
+    return true;
+  }
+
+  /**
+   * Enhanced message validation
+   */
+  validateMessage(message) {
+    if (!message || typeof message !== 'object') {
+      return { valid: false, error: 'Message must be an object' };
+    }
+
+    if (!message.type || typeof message.type !== 'string') {
+      return { valid: false, error: 'Message must have a string type field' };
+    }
+
+    if (!message.connectionId || typeof message.connectionId !== 'string') {
+      return { valid: false, error: 'Message must have a string connectionId field' };
+    }
+
+    // Validate message type
+    const validTypes = ['browser_connect', 'desktop_connect', 'edit_request', 'code_update', 'ping'];
+    if (!validTypes.includes(message.type)) {
+      return { valid: false, error: `Unknown message type: ${message.type}` };
+    }
+
+    // Type-specific validation
+    switch (message.type) {
+      case 'browser_connect':
+      case 'desktop_connect':
+        if (!message.userId || typeof message.userId !== 'string') {
+          return { valid: false, error: `${message.type} requires userId field` };
+        }
+        if (message.userId.length > 255) {
+          return { valid: false, error: 'userId must be 255 characters or less' };
+        }
+        break;
+        
+      case 'edit_request':
+        if (!message.userId || !message.sessionId || !message.payload) {
+          return { valid: false, error: 'edit_request requires userId, sessionId, and payload' };
+        }
+        if (!message.payload.textareaId || !message.payload.code) {
+          return { valid: false, error: 'edit_request payload requires textareaId and code' };
+        }
+        if (message.payload.code.length > 10 * 1024 * 1024) { // 10MB limit
+          return { valid: false, error: 'Code payload too large (max 10MB)' };
+        }
+        break;
+        
+      case 'code_update':
+        if (!message.sessionId || !message.payload) {
+          return { valid: false, error: 'code_update requires sessionId and payload' };
+        }
+        if (!message.payload.code) {
+          return { valid: false, error: 'code_update payload requires code field' };
+        }
+        break;
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Enhanced rate limiting with sliding window
+   */
+  checkRateLimit(clientIP) {
+    if (!this.config.security.rateLimiting.enabled) {
+      return true;
+    }
+
+    const key = `ratelimit_${clientIP}`;
+    const now = Date.now();
+    const windowMs = this.config.security.rateLimiting.windowMs;
+    const maxRequests = this.config.security.rateLimiting.maxRequests;
+
+    let record = this.rateLimitStore.get(key);
+    
+    if (!record) {
+      record = { requests: [], resetTime: now + windowMs };
+      this.rateLimitStore.set(key, record);
+    }
+
+    // Remove old requests outside the window
+    record.requests = record.requests.filter(timestamp => now - timestamp < windowMs);
+    
+    // Add current request
+    record.requests.push(now);
+    
+    // Update reset time
+    record.resetTime = now + windowMs;
+    
+    return record.requests.length <= maxRequests;
+  }
+
+  /**
+   * Initialize and start the server
+   */
+  async start() {
+    try {
+      this.setupExpress();
+      this.setupWebSocket();
+      this.setupRoutes();
+      this.setupErrorHandling();
+      
+      // Create server but don't log immediately (for testing)
+      await new Promise((resolve, reject) => {
+        this.server = this.app.listen(this.config.server.port, this.config.server.host, (error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          
+          // Only log if not in test environment
+          if (process.env.NODE_ENV !== 'test') {
+            console.log(`Web-IDE-Bridge server v0.1.3 running on ${this.config.server.host}:${this.config.server.port}`);
+            console.log(`WebSocket endpoint: ${this.wsOptions.path}`);
+            console.log(`Environment: ${this.config.environment}`);
+            console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
+          }
+          
+          resolve();
+        });
+      });
+
+      // Create WebSocket server after HTTP server is created
+      this.wss = new WebSocket.Server({
+        server: this.server,
+        ...this.wsOptions
+      });
+
+      this.setupWebSocketHandlers();
+      this.setupGracefulShutdown();
+      
+    } catch (error) {
+      console.error('Failed to start server:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set up Express application with middleware
+   */
+  setupExpress() {
+    // Security middleware
+    if (this.config.security.helmet?.enabled !== false) {
+      this.app.use(helmet({
+        contentSecurityPolicy: this.config.security.helmet?.contentSecurityPolicy !== false
+      }));
+    }
+
+    // Compression
+    this.app.use(compression());
+
+    // CORS
+    this.app.use(cors(this.config.cors));
+
+    // Logging
+    if (this.config.logging.enableAccessLog) {
+      this.app.use(morgan(this.config.logging.format || 'combined'));
+    }
+
+    // Session management
+    this.app.use(session(this.config.session));
+
+    // Body parsing
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  }
+
+  /**
+   * Set up WebSocket server options
+   */
+  setupWebSocket() {
+    // WebSocket server will be created after HTTP server is started
+    this.wsOptions = {
+      path: this.config.endpoints?.websocket || this.config.server.websocketEndpoint,
+      maxPayload: 10 * 1024 * 1024, // 10MB max payload
+      clientTracking: true
+    };
+  }
+
+  /**
+   * Set up WebSocket event handlers
+   */
+  setupWebSocketHandlers() {
+    this.wss.on('connection', (ws, req) => {
+      this.handleConnection(ws, req);
+    });
+
+    this.wss.on('error', (error) => {
+      console.error('WebSocket server error:', error);
+      this.metrics.errors++;
+    });
+
+    // Heartbeat mechanism
+    if (this.config.server.heartbeatInterval > 0) {
+      this.setupHeartbeat();
+    }
+
+    // Connection limit check
+    this.wss.on('connection', (ws) => {
+      if (this.wss.clients.size > this.config.server.maxConnections) {
+        ws.close(1008, 'Server at capacity');
+        return;
+      }
+    });
+  }
+
+  /**
+   * Handle new WebSocket connections
+   */
+  handleConnection(ws, req) {
+    const connectionId = uuidv4();
+    const clientIP = req.socket.remoteAddress;
+    
+    this.metrics.totalConnections++;
+    
+    if (this.config.debug) {
+      console.log(`New WebSocket connection: ${connectionId} from ${clientIP}`);
+    }
+
+    // Set up connection properties
+    ws.connectionId = connectionId;
+    ws.isAlive = true;
+    ws.connectedAt = Date.now();
+    ws.clientIP = clientIP;
+
+    // Rate limiting per IP
+    if (this.config.security.rateLimiting?.enabled) {
+      if (!this.checkRateLimit(clientIP)) {
+        ws.close(1008, 'Rate limit exceeded');
+        return;
+      }
+    }
+
+    // Connection timeout
+    const connectionTimeout = setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, 'Connection timeout - no authentication');
+      }
+    }, this.config.server.connectionTimeout);
+
+    // Send initial connection info to client
+    this.sendMessage(ws, {
+      type: 'connection_init',
+      connectionId: connectionId,
+      timestamp: Date.now()
+    });
+
+    // Message handling
+    ws.on('message', (data) => {
+      try {
+        // Clear timeout once we receive a message
+        clearTimeout(connectionTimeout);
+        
+        const message = JSON.parse(data);
+        this.routeMessage(ws, message);
+        this.metrics.messagesProcessed++;
+      } catch (error) {
+        this.handleError(ws, 'Invalid JSON message', error);
+      }
+    });
+
+    // Connection close handling
+    ws.on('close', (code, reason) => {
+      clearTimeout(connectionTimeout);
+      this.handleDisconnection(ws, code, reason);
+    });
+
+    // Error handling
+    ws.on('error', (error) => {
+      clearTimeout(connectionTimeout);
+      this.handleError(ws, 'WebSocket error', error);
+    });
+
+    // Heartbeat
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+  }
+
+  /**
+   * Route incoming WebSocket messages with enhanced validation
+   */
+  routeMessage(ws, message) {
+    // Enhanced message validation
+    const validation = this.validateMessage(message);
+    if (!validation.valid) {
+      this.sendError(ws, validation.error);
+      return;
+    }
+
+    // Validate connectionId matches
+    if (message.connectionId !== ws.connectionId) {
+      this.sendError(ws, 'Invalid connectionId: does not match connection');
+      return;
+    }
+
+    if (this.config.debug) {
+      console.log(`Routing message: ${message.type} from ${ws.connectionId}`);
+    }
+
+    try {
+      switch (message.type) {
+        case 'browser_connect':
+          this.handleBrowserConnect(ws, message);
+          break;
+        case 'desktop_connect':
+          this.handleDesktopConnect(ws, message);
+          break;
+        case 'edit_request':
+          this.handleEditRequest(ws, message);
+          break;
+        case 'code_update':
+          this.handleCodeUpdate(ws, message);
+          break;
+        case 'ping':
+          this.handlePing(ws, message);
+          break;
+        default:
+          this.sendError(ws, `Unknown message type: ${message.type}`);
+      }
+    } catch (error) {
+      this.handleError(ws, `Error processing ${message.type}`, error);
+    }
+  }
+
+  /**
+   * Handle browser client connection
+   */
+  handleBrowserConnect(ws, message) {
+    const { userId } = message;
+    
+    if (!userId) {
+      this.sendError(ws, 'Browser connection requires userId');
+      return;
+    }
+
+    // Store browser connection
+    this.browserConnections.set(ws.connectionId, {
+      ws,
+      userId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now()
+    });
+
+    // Update user session
+    const userSession = this.userSessions.get(userId) || {};
+    userSession.browserId = ws.connectionId;
+    this.userSessions.set(userId, userSession);
+
+    this.metrics.activeConnections.browser = this.browserConnections.size;
+
+    // Send acknowledgment
+    this.sendMessage(ws, {
+      type: 'connection_ack',
+      connectionId: ws.connectionId,
+      status: 'connected',
+      role: 'browser'
+    });
+
+    if (this.config.debug) {
+      console.log(`Browser connected: userId=${userId}, connectionId=${ws.connectionId}`);
+    }
+  }
+
+  /**
+   * Handle desktop client connection
+   */
+  handleDesktopConnect(ws, message) {
+    const { userId } = message;
+    
+    if (!userId) {
+      this.sendError(ws, 'Desktop connection requires userId');
+      return;
+    }
+
+    // Store desktop connection
+    this.desktopConnections.set(ws.connectionId, {
+      ws,
+      userId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now()
+    });
+
+    // Update user session
+    const userSession = this.userSessions.get(userId) || {};
+    userSession.desktopId = ws.connectionId;
+    this.userSessions.set(userId, userSession);
+
+    this.metrics.activeConnections.desktop = this.desktopConnections.size;
+
+    // Send acknowledgment
+    this.sendMessage(ws, {
+      type: 'connection_ack',
+      connectionId: ws.connectionId,
+      status: 'connected',
+      role: 'desktop'
+    });
+
+    if (this.config.debug) {
+      console.log(`Desktop connected: userId=${userId}, connectionId=${ws.connectionId}`);
+    }
+  }
+
+  /**
+   * Handle edit request from browser
+   */
+  handleEditRequest(ws, message) {
+    const { userId, sessionId, payload } = message;
+    
+    if (!userId || !sessionId || !payload) {
+      this.sendError(ws, 'Edit request requires userId, sessionId, and payload');
+      return;
+    }
+
+    // Find user's desktop connection
+    const userSession = this.userSessions.get(userId);
+    if (!userSession || !userSession.desktopId) {
+      this.sendError(ws, 'No desktop connection found for user');
+      return;
+    }
+
+    const desktopConn = this.desktopConnections.get(userSession.desktopId);
+    if (!desktopConn) {
+      this.sendError(ws, 'Desktop connection no longer active');
+      return;
+    }
+
+    // Store active session
+    this.activeSessions.set(sessionId, {
+      userId,
+      textareaId: payload.textareaId,
+      browserConnectionId: ws.connectionId,
+      desktopConnectionId: userSession.desktopId,
+      createdAt: Date.now(),
+      lastActivity: Date.now()
+    });
+
+    this.metrics.totalSessions++;
+
+    // Forward to desktop
+    this.sendMessage(desktopConn.ws, {
+      type: 'edit_request',
+      sessionId,
+      payload
+    });
+
+    if (this.config.debug) {
+      console.log(`Edit request: userId=${userId}, sessionId=${sessionId}, textareaId=${payload.textareaId}`);
+    }
+  }
+
+  /**
+   * Handle code update from desktop
+   */
+  handleCodeUpdate(ws, message) {
+    const { sessionId, payload } = message;
+    
+    if (!sessionId || !payload) {
+      this.sendError(ws, 'Code update requires sessionId and payload');
+      return;
+    }
+
+    // Find active session
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      this.sendError(ws, 'Session not found or expired');
+      return;
+    }
+
+    // Update session activity
+    session.lastActivity = Date.now();
+
+    // Find browser connection
+    const browserConn = this.browserConnections.get(session.browserConnectionId);
+    if (!browserConn) {
+      this.sendError(ws, 'Browser connection no longer active');
+      return;
+    }
+
+    // Forward to browser
+    this.sendMessage(browserConn.ws, {
+      type: 'code_update',
+      payload: {
+        textareaId: session.textareaId,
+        code: payload.code
+      }
+    });
+
+    if (this.config.debug) {
+      console.log(`Code update: sessionId=${sessionId}, textareaId=${session.textareaId}`);
+    }
+  }
+
+  /**
+   * Handle ping message
+   */
+  handlePing(ws, message) {
+    this.sendMessage(ws, {
+      type: 'pong',
+      payload: message.payload || {},
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Handle WebSocket disconnection
+   */
+  handleDisconnection(ws, code, reason) {
+    if (this.config.debug) {
+      console.log(`WebSocket disconnected: ${ws.connectionId}, code=${code}, reason=${reason}`);
+    }
+
+    // Remove from browser connections
+    if (this.browserConnections.has(ws.connectionId)) {
+      const browserConn = this.browserConnections.get(ws.connectionId);
+      this.browserConnections.delete(ws.connectionId);
+      
+      // Update user session
+      const userSession = this.userSessions.get(browserConn.userId);
+      if (userSession && userSession.browserId === ws.connectionId) {
+        delete userSession.browserId;
+        if (Object.keys(userSession).length === 0) {
+          this.userSessions.delete(browserConn.userId);
+        }
+      }
+    }
+
+    // Remove from desktop connections
+    if (this.desktopConnections.has(ws.connectionId)) {
+      const desktopConn = this.desktopConnections.get(ws.connectionId);
+      this.desktopConnections.delete(ws.connectionId);
+      
+      // Update user session
+      const userSession = this.userSessions.get(desktopConn.userId);
+      if (userSession && userSession.desktopId === ws.connectionId) {
+        delete userSession.desktopId;
+        if (Object.keys(userSession).length === 0) {
+          this.userSessions.delete(desktopConn.userId);
+        }
+      }
+    }
+
+    // Clean up active sessions associated with this connection
+    for (const [sessionId, session] of this.activeSessions.entries()) {
+      if (session.browserConnectionId === ws.connectionId || 
+          session.desktopConnectionId === ws.connectionId) {
+        this.activeSessions.delete(sessionId);
+      }
+    }
+
+    // Update metrics
+    this.metrics.activeConnections.browser = this.browserConnections.size;
+    this.metrics.activeConnections.desktop = this.desktopConnections.size;
+  }
+
+  /**
+   * Send message to WebSocket client
+   */
+  sendMessage(ws, message) {
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(message));
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
+    }
+  }
+
+  /**
+   * Send error message to client
+   */
+  sendError(ws, message, code = 'ERROR') {
+    this.metrics.errors++;
+    
+    if (this.config.debug) {
+      console.error(`Error: ${message} (connection: ${ws.connectionId})`);
+    }
+    
+    this.sendMessage(ws, {
+      type: 'error',
+      payload: { message, code }
+    });
+  }
+
+  /**
+   * Handle errors
+   */
+  handleError(ws, context, error) {
+    this.metrics.errors++;
+    console.error(`${context} (connection: ${ws.connectionId}):`, error);
+    
+    this.sendError(ws, `${context}: ${error.message}`);
+  }
+
+  /**
+   * Generate HTML status page
+   */
+  generateStatusPage() {
+    const uptime = process.uptime();
+    const uptimeFormatted = this.formatUptime(uptime);
+    const memoryUsage = process.memoryUsage();
+    
+    const connectionStatus = this.browserConnections.size > 0 || this.desktopConnections.size > 0 
+      ? 'active' 
+      : 'waiting';
+    
+    const statusColor = connectionStatus === 'active' ? '#10b981' : '#f59e0b';
+    
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-IDE-Bridge Server Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2rem;
+            max-width: 800px;
+            width: 90%;
+            margin: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #f3f4f6;
+            padding-bottom: 1.5rem;
+        }
+        
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 1rem;
+            background-color: ${statusColor};
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .card-content {
+            space-y: 0.75rem;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .metric-value.number {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #e5e7eb;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .footer a {
+            color: #4f46e5;
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .version {
+            background: #4f46e5;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .title {
+                font-size: 1.5rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Web-IDE-Bridge Server</h1>
+            <p class="subtitle">WebSocket relay server for seamless IDE integration</p>
+            <span class="version">v0.1.3</span>
+            <div class="status-badge">${connectionStatus}</div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2 class="card-title">🔗 Connections</h2>
+                <div class="card-content">
+                    <div class="metric">
+                        <span class="metric-label">Browser Clients</span>
+                        <span class="metric-value number">${this.browserConnections.size}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Desktop Clients</span>
+                        <span class="metric-value number">${this.desktopConnections.size}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Connected</span>
+                        <span class="metric-value number">${this.browserConnections.size + this.desktopConnections.size}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Since Start</span>
+                        <span class="metric-value number">${this.metrics.totalConnections}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title">📝 Sessions</h2>
+                <div class="card-content">
+                    <div class="metric">
+                        <span class="metric-label">Active Users</span>
+                        <span class="metric-value number">${this.userSessions.size}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Active Edit Sessions</span>
+                        <span class="metric-value number">${this.activeSessions.size}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Sessions</span>
+                        <span class="metric-value number">${this.metrics.totalSessions}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title">📊 Performance</h2>
+                <div class="card-content">
+                    <div class="metric">
+                        <span class="metric-label">Uptime</span>
+                        <span class="metric-value">${uptimeFormatted}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Messages Processed</span>
+                        <span class="metric-value number">${this.metrics.messagesProcessed}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Memory Used</span>
+                        <span class="metric-value">${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Errors</span>
+                        <span class="metric-value number">${this.metrics.errors}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title">⚙️ Configuration</h2>
+                <div class="card-content">
+                    <div class="metric">
+                        <span class="metric-label">Environment</span>
+                        <span class="metric-value">${this.config.environment}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">WebSocket Path</span>
+                        <span class="metric-value">${this.wsOptions.path}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Max Connections</span>
+                        <span class="metric-value number">${this.config.server.maxConnections}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Debug Mode</span>
+                        <span class="metric-value">${this.config.debug ? '✅ Enabled' : '❌ Disabled'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <a href="${this.config.endpoints?.health || '/web-ide-bridge/health'}">Health Check</a>
+                ${this.config.debug ? `<a href="${this.config.endpoints?.debug || '/web-ide-bridge/debug'}">Debug Info</a>` : ''}
+                <a href="https://github.com/peterthoeny/web-ide-bridge">GitHub</a>
+            </p>
+            <p style="margin-top: 0.5rem;">
+                Server started: ${new Date(this.metrics.startTime).toLocaleString()}
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => {
+            window.location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>`;
+  }
+
+  /**
+   * Format uptime in human-readable format
+   */
+  formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  }
+
+  /**
+   * Set up HTTP routes
+   */
+  setupRoutes() {
+    // Redirect root to status page
+    this.app.get('/', (req, res) => {
+      res.redirect(this.config.endpoints?.status || '/web-ide-bridge/status');
+    });
+
+    // Health check (JSON endpoint for monitoring)
+    this.app.get(this.config.endpoints?.health || '/web-ide-bridge/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        version: '0.1.3',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Status page (HTML for browsers, JSON for API calls)
+    this.app.get(this.config.endpoints?.status || '/web-ide-bridge/status', (req, res) => {
+      const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
+      const userAgent = req.headers['user-agent'] || '';
+      const isApiCall = acceptsJson || userAgent.includes('node-fetch') || userAgent.includes('curl');
+      
+      if (isApiCall) {
+        // Return JSON for API calls and tests
+        res.json({
+          active: true,
+          version: '0.1.3',
+          uptime: process.uptime(),
+          connections: {
+            browser: this.browserConnections.size,
+            desktop: this.desktopConnections.size,
+            total: this.browserConnections.size + this.desktopConnections.size
+          },
+          sessions: {
+            users: this.userSessions.size,
+            active: this.activeSessions.size,
+            total: this.metrics.totalSessions
+          },
+          metrics: {
+            totalConnections: this.metrics.totalConnections,
+            messagesProcessed: this.metrics.messagesProcessed,
+            errors: this.metrics.errors,
+            startTime: new Date(this.metrics.startTime).toISOString()
+          }
+        });
+      } else {
+        // Return HTML for browser requests
+        res.setHeader('Content-Type', 'text/html');
+        res.send(this.generateStatusPage());
+      }
+    });
+
+    // Debug endpoint (JSON - available in debug mode OR test environment)
+    if (this.config.debug || process.env.NODE_ENV === 'test') {
+      this.app.get(this.config.endpoints?.debug || '/web-ide-bridge/debug', (req, res) => {
+        res.json({
+          browserConnections: Array.from(this.browserConnections.entries()).map(([id, conn]) => ({
+            connectionId: id,
+            userId: conn.userId,
+            connectedAt: new Date(conn.connectedAt).toISOString(),
+            lastActivity: new Date(conn.lastActivity).toISOString()
+          })),
+          desktopConnections: Array.from(this.desktopConnections.entries()).map(([id, conn]) => ({
+            connectionId: id,
+            userId: conn.userId,
+            connectedAt: new Date(conn.connectedAt).toISOString(),
+            lastActivity: new Date(conn.lastActivity).toISOString()
+          })),
+          userSessions: Array.from(this.userSessions.entries()),
+          activeSessions: Array.from(this.activeSessions.entries()).map(([id, session]) => ({
+            sessionId: id,
+            userId: session.userId,
+            textareaId: session.textareaId,
+            browserConnectionId: session.browserConnectionId,
+            desktopConnectionId: session.desktopConnectionId,
+            createdAt: new Date(session.createdAt).toISOString(),
+            lastActivity: new Date(session.lastActivity).toISOString()
+          })),
+          config: this.config,
+          process: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            version: process.version,
+            platform: process.platform
+          }
+        });
+      });
+    }
+
+    // 404 handler
+    this.app.use((req, res) => {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'The requested endpoint does not exist'
+      });
+    });
+  }
+
+  /**
+   * Set up error handling
+   */
+  setupErrorHandling() {
+    this.app.use((error, req, res, next) => {
+      console.error('Express error:', error);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: this.config.debug ? error.message : 'An unexpected error occurred'
+      });
+    });
+  }
+
+  /**
+   * Set up heartbeat mechanism
+   */
+  setupHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.heartbeatInterval = setInterval(() => {
+      this.wss.clients.forEach((ws) => {
+        if (!ws.isAlive) {
+          ws.terminate();
+          return;
+        }
+        
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, this.config.server.heartbeatInterval);
+  }
+
+  /**
+   * Set up periodic cleanup with rate limit store cleanup
+   */
+  setupCleanupScheduler() {
+    if (!this.config.cleanup.enablePeriodicCleanup) {
+      return;
+    }
+
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSessions();
+      this.cleanupRateLimitStore();
+    }, this.config.cleanup.sessionCleanupInterval);
+  }
+
+  /**
+   * Clean up expired sessions
+   */
+  cleanupExpiredSessions() {
+    const now = Date.now();
+    const maxAge = this.config.cleanup.maxSessionAge;
+    let cleanedCount = 0;
+
+    for (const [sessionId, session] of this.activeSessions.entries()) {
+      if (session && typeof session === 'object' && session.lastActivity && now - session.lastActivity > maxAge) {
+        this.activeSessions.delete(sessionId);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0 && this.config.debug) {
+      console.log(`Cleaned up ${cleanedCount} expired sessions`);
+    }
+  }
+
+  /**
+   * Clean up expired rate limit entries
+   */
+  cleanupRateLimitStore() {
+    if (!this.rateLimitStore) {
+      return;
+    }
+
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, record] of this.rateLimitStore.entries()) {
+      if (record.resetTime && now > record.resetTime) {
+        this.rateLimitStore.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0 && this.config.debug) {
+      console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
+    }
+  }
+
+  /**
+   * Set up graceful shutdown
+   */
+  setupGracefulShutdown() {
+    // Only set up process handlers if not in test environment
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    const shutdown = (signal) => {
+      console.log(`Received ${signal}, shutting down gracefully...`);
+      this.shutdown();
+    };
+
+    // Remove existing handlers if they exist
+    this.removeProcessHandlers();
+
+    // Set up new handlers and store references
+    this.processHandlers.SIGTERM = () => shutdown('SIGTERM');
+    this.processHandlers.SIGINT = () => shutdown('SIGINT');
+    this.processHandlers.uncaughtException = (error) => {
+      console.error('Uncaught Exception:', error);
+      this.shutdown();
+    };
+    this.processHandlers.unhandledRejection = (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      this.shutdown();
+    };
+
+    process.on('SIGTERM', this.processHandlers.SIGTERM);
+    process.on('SIGINT', this.processHandlers.SIGINT);
+    process.on('uncaughtException', this.processHandlers.uncaughtException);
+    process.on('unhandledRejection', this.processHandlers.unhandledRejection);
+  }
+
+  /**
+   * Remove process event handlers
+   */
+  removeProcessHandlers() {
+    if (this.processHandlers.SIGTERM) {
+      process.removeListener('SIGTERM', this.processHandlers.SIGTERM);
+    }
+    if (this.processHandlers.SIGINT) {
+      process.removeListener('SIGINT', this.processHandlers.SIGINT);
+    }
+    if (this.processHandlers.uncaughtException) {
+      process.removeListener('uncaughtException', this.processHandlers.uncaughtException);
+    }
+    if (this.processHandlers.unhandledRejection) {
+      process.removeListener('unhandledRejection', this.processHandlers.unhandledRejection);
+    }
+  }
+
+  /**
+   * Shutdown server gracefully
+   */
+  async shutdown() {
+    try {
+      console.log('Starting server shutdown...');
+      
+      // Clear all intervals first
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
+        console.log('Cleared cleanup interval');
+      }
+      
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+        console.log('Cleared heartbeat interval');
+      }
+
+      // Close all WebSocket connections with proper cleanup
+      if (this.wss && this.wss.clients) {
+        console.log(`Closing ${this.wss.clients.size} WebSocket connections...`);
+        const closePromises = [];
+        
+        this.wss.clients.forEach((ws) => {
+          if (ws.readyState === 1) { // WebSocket.OPEN
+            closePromises.push(new Promise((resolve) => {
+              ws.once('close', resolve);
+              ws.close(1001, 'Server shutting down');
+              // Force close after timeout
+              setTimeout(() => {
+                if (ws.readyState !== 3) { // Not CLOSED
+                  ws.terminate();
+                }
+                resolve();
+              }, 1000);
+            }));
+          }
+        });
+        
+        await Promise.all(closePromises);
+        console.log('All WebSocket connections closed');
+      }
+
+      // Close WebSocket server
+      if (this.wss) {
+        await new Promise((resolve, reject) => {
+          this.wss.close((error) => {
+            if (error) {
+              console.error('Error closing WebSocket server:', error);
+              reject(error);
+            } else {
+              console.log('WebSocket server closed');
+              resolve();
+            }
+          });
+        });
+        this.wss = null;
+      }
+
+      // Close HTTP server
+      if (this.server) {
+        await new Promise((resolve, reject) => {
+          this.server.close((error) => {
+            if (error) {
+              console.error('Error closing HTTP server:', error);
+              reject(error);
+            } else {
+              console.log('HTTP server closed');
+              resolve();
+            }
+          });
+        });
+        this.server = null;
+      }
+
+      // Clear all data structures
+      if (this.browserConnections) {
+        this.browserConnections.clear();
+      }
+      if (this.desktopConnections) {
+        this.desktopConnections.clear();
+      }
+      if (this.userSessions) {
+        this.userSessions.clear();
+      }
+      if (this.activeSessions) {
+        this.activeSessions.clear();
+      }
+      if (this.rateLimitStore) {
+        this.rateLimitStore.clear();
+      }
+
+      // Remove process handlers
+      this.removeProcessHandlers();
+
+      console.log('Server shutdown complete');
+      
+      // Give a moment for everything to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      console.error('Error during shutdown:', error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * CLI handling
+ */
+function main() {
+  const args = process.argv.slice(2);
+  
+  // Simple argument parsing
+  let port = null;
+  let configPath = null;
+  
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--port':
+      case '-p':
+        port = parseInt(args[++i]);
+        break;
+      case '--config':
+      case '-c':
+        configPath = args[++i];
+        break;
+      case '--help':
+      case '-h':
+        console.log(`
+Web-IDE-Bridge Server v0.1.3
+
+Usage: web-ide-bridge-server [options]
+
+Options:
+  -p, --port <port>      Port to listen on (default: 8071)
+  -c, --config <path>    Path to configuration file
+  -h, --help             Show this help message
+  
+Environment Variables:
+  WEB_IDE_BRIDGE_PORT    Override port number
+  WEB_IDE_BRIDGE_CONFIG  Path to configuration file
+  WEB_IDE_BRIDGE_SECRET  Session secret (production)
+  NODE_ENV               Environment (development/production)
+  DEBUG                  Enable debug logging
+  
+Configuration Files (checked in order):
+  1. $WEB_IDE_BRIDGE_CONFIG (if set)
+  2. /etc/web-ide-bridge-server.conf
+  3. ./web-ide-bridge-server.conf
+  
+Examples:
+  web-ide-bridge-server
+  web-ide-bridge-server --port 3000
+  web-ide-bridge-server --config /path/to/config.conf
+  DEBUG=true web-ide-bridge-server
+        `);
+        process.exit(0);
+        break;
+      default:
+        console.error(`Unknown option: ${args[i]}`);
+        process.exit(1);
+    }
+  }
+  
+  // Set environment variables from CLI args
+  if (port) {
+    process.env.WEB_IDE_BRIDGE_PORT = port.toString();
+  }
+  
+  if (configPath) {
+    process.env.WEB_IDE_BRIDGE_CONFIG = configPath;
+  }
+  
+  // Create and start server
+  const server = new WebIdeBridgeServer();
+  server.start().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+// Start server if this file is run directly
+if (require.main === module) {
+  main();
+}
+
+module.exports = WebIdeBridgeServer;

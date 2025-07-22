@@ -1,0 +1,81 @@
+{
+  "name": "web-ide-bridge",
+  "version": "0.1.3",
+  "description": "Bridge web applications to desktop IDEs for seamless code editing",
+  "private": true,
+  "workspaces": [
+    "server",
+    "browser",
+    "desktop"
+  ],
+  "scripts": {
+    "test": "jest",
+    "test:server": "jest tests/server",
+    "test:browser": "jest tests/browser",
+    "test:desktop": "jest tests/desktop", 
+    "test:e2e": "jest tests/e2e",
+    "test:performance": "jest tests/server/performance.test.js",
+    "test:edge-cases": "jest tests/server/edge-cases.test.js",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --coverage --watchAll=false --verbose",
+    "lint": "eslint . --ext .js,.ts",
+    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "dev:server": "cd server && npm run dev",
+    "start:server": "cd server && npm start",
+    "build": "npm run build:server && npm run build:browser && npm run build:desktop",
+    "build:server": "cd server && npm run build",
+    "build:browser": "cd browser && npm run build", 
+    "build:desktop": "cd desktop && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peterthoeny/web-ide-bridge.git"
+  },
+  "keywords": [
+    "ide",
+    "bridge", 
+    "websocket",
+    "code-editor",
+    "tauri",
+    "desktop",
+    "web-development"
+  ],
+  "author": "Peter Thoeny",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/peterthoeny/web-ide-bridge/issues"
+  },
+  "homepage": "https://github.com/peterthoeny/web-ide-bridge#readme",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.51.0",
+    "eslint-config-node": "^4.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "server/**/*.js",
+      "browser/**/*.js",
+      "!**/node_modules/**",
+      "!**/coverage/**",
+      "!**/dist/**",
+      "!**/build/**"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/tests/**/*.spec.js"
+    ],
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testTimeout": 10000,
+    "moduleDirectories": ["node_modules", "<rootDir>"],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/coverage/",
+      "/dist/",
+      "/build/"
+    ]
+  }
+}
