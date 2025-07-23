@@ -14,7 +14,7 @@ class WebIdeBridge {
 
     // Configuration
     this.userId = userId;
-    this.connectionId = generateUUID();
+    this.connectionId = options.connectionId || generateUUID(); // Allow custom connectionId
     this.options = {
       serverUrl: 'ws://localhost:8071/web-ide-bridge/ws',
       autoReconnect: true,
@@ -56,27 +56,21 @@ class WebIdeBridge {
   }
 
   /**
-   * Handle connection initialization from server
+   * Handle connection acknowledgment from server
    */
-  _handleConnectionInit(message) {
-    if (message.connectionId) {
-      // Update our connection ID to match what the server assigned
-      this.connectionId = message.connectionId;
-      this._log('Connection ID updated from server', this.connectionId);
-      
-      // Now send browser connection message with correct ID
-      const connectMessage = {
-        type: 'browser_connect',
-        connectionId: this.connectionId,
-        userId: this.userId,
-        timestamp: Date.now()
-      };
-      
-      this._sendMessage(connectMessage);
-      
-      // Start heartbeat only after we have the correct connection ID
-      this._startHeartbeat();
-    }
+  _handleConnectionAck(message) {
+    this._log('Connection acknowledged by server');
+
+    // Now send browser connection message
+    const connectMessage = {
+      type: 'browser_connect',
+      connectionId: this.connectionId,
+      userId: this.userId,
+      timestamp: Date.now()
+    };
+
+    this._sendMessage(connectMessage);
+    this._startHeartbeat();
   }
 
   /**
@@ -107,19 +101,19 @@ class WebIdeBridge {
    */
   disconnect() {
     this._log('Disconnecting from server');
-    
+
     // Clear all timeouts
     this._clearTimeouts();
-    
+
     // Disable auto-reconnect
     this.options.autoReconnect = false;
-    
+
     // Close WebSocket connection
     if (this.ws) {
       this.ws.close(1000, 'Client disconnect');
       this.ws = null;
     }
-    
+
     this.connected = false;
     this.connecting = false;
     this._updateStatus('disconnected');
@@ -158,7 +152,7 @@ class WebIdeBridge {
     }
 
     const sessionId = generateUUID();
-    
+
     const message = {
       type: 'edit_request',
       connectionId: this.connectionId,
@@ -174,7 +168,7 @@ class WebIdeBridge {
 
     this._log('Sending edit request', { textareaId, fileType, sessionId });
     this._sendMessage(message);
-    
+
     return sessionId;
   }
 
@@ -186,7 +180,7 @@ class WebIdeBridge {
       throw new Error('Callback must be a function');
     }
     this.statusCallbacks.push(callback);
-    
+
     // Immediately call with current status
     callback(this.getConnectionState());
   }
@@ -251,9 +245,9 @@ class WebIdeBridge {
     return new Promise((resolve, reject) => {
       try {
         this._log('Establishing WebSocket connection', { url: this.options.serverUrl });
-        
+
         this.ws = new WebSocket(this.options.serverUrl);
-        
+
         // Set connection timeout
         this.connectionTimeout = setTimeout(() => {
           if (this.ws.readyState !== WebSocket.OPEN) {
@@ -296,10 +290,18 @@ class WebIdeBridge {
   _handleConnectionOpen() {
     this.connected = true;
     this.connecting = false;
-    
-    // Wait for connection_init message from server to get the real connectionId
-    // Don't send browser_connect immediately or start heartbeat yet
+
+    // Send browser connection message with our connectionId
+    const connectMessage = {
+      type: 'browser_connect',
+      connectionId: this.connectionId,
+      userId: this.userId,
+      timestamp: Date.now()
+    };
+
+    this._sendMessage(connectMessage);
     this._updateStatus('connected');
+    this._startHeartbeat();
   }
 
   /**
@@ -307,12 +309,12 @@ class WebIdeBridge {
    */
   _handleConnectionClose(event) {
     this._log('WebSocket connection closed', { code: event.code, reason: event.reason });
-    
+
     this.connected = false;
     this.connecting = false;
     this._clearTimeouts();
     this._updateStatus('disconnected');
-    
+
     // Attempt reconnection if enabled
     if (this.options.autoReconnect && event.code !== 1000) {
       this._scheduleReconnect();
@@ -325,7 +327,7 @@ class WebIdeBridge {
   _handleConnectionError(error) {
     this._log('Connection error', error);
     this._triggerErrorCallbacks(error.message || 'Connection failed');
-    
+
     if (this.options.autoReconnect) {
       this._scheduleReconnect();
     }
@@ -338,7 +340,7 @@ class WebIdeBridge {
     try {
       const message = JSON.parse(event.data);
       this._log('Received message', message);
-      
+
       // Trigger message callbacks
       this.messageCallbacks.forEach(callback => {
         try {
@@ -347,33 +349,29 @@ class WebIdeBridge {
           this._log('Error in message callback', error);
         }
       });
-      
+
       // Handle specific message types
       switch (message.type) {
-        case 'connection_init':
-          this._handleConnectionInit(message);
-          break;
-          
         case 'connection_ack':
           this._log('Connection acknowledged by server');
           break;
-          
+
         case 'code_update':
           this._handleCodeUpdate(message);
           break;
-          
+
         case 'pong':
           this._log('Received pong from server');
           break;
-          
+
         case 'error':
           this._handleServerError(message);
           break;
-          
+
         default:
           this._log('Unknown message type', message.type);
       }
-      
+
     } catch (error) {
       this._log('Error parsing message', error);
       this._log('Raw message data', event.data);
@@ -392,7 +390,7 @@ class WebIdeBridge {
 
     const { textareaId, code } = message.payload;
     this._log('Received code update', { textareaId, codeLength: code.length });
-    
+
     // Trigger code update callbacks
     this.codeUpdateCallbacks.forEach(callback => {
       try {
@@ -434,7 +432,7 @@ class WebIdeBridge {
    */
   _startHeartbeat() {
     this._clearHeartbeat();
-    
+
     if (this.options.heartbeatInterval > 0) {
       this.heartbeatTimeout = setTimeout(() => {
         if (this.connected) {
@@ -479,7 +477,7 @@ class WebIdeBridge {
     );
 
     this._log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
-    
+
     this.reconnectTimeout = setTimeout(() => {
       this.debouncedReconnect();
     }, delay);
@@ -495,7 +493,7 @@ class WebIdeBridge {
 
     this.reconnectAttempts++;
     this._log(`Reconnect attempt ${this.reconnectAttempts}`);
-    
+
     try {
       await this.connect();
     } catch (error) {
@@ -514,12 +512,12 @@ class WebIdeBridge {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-    
+
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
-    
+
     this._clearHeartbeat();
   }
 
@@ -528,7 +526,7 @@ class WebIdeBridge {
    */
   _updateStatus(status) {
     this._log('Status changed to', status);
-    
+
     this.statusCallbacks.forEach(callback => {
       try {
         callback(status);

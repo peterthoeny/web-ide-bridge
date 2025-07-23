@@ -12,7 +12,7 @@ export function generateUUID() {
       return v.toString(16);
     });
   }
-  
+
   /**
    * Validate WebSocket server URL
    */
@@ -20,7 +20,7 @@ export function generateUUID() {
     if (!url || typeof url !== 'string') {
       return false;
     }
-    
+
     try {
       const urlObj = new URL(url);
       return urlObj.protocol === 'ws:' || urlObj.protocol === 'wss:';
@@ -28,33 +28,33 @@ export function generateUUID() {
       return false;
     }
   }
-  
+
   /**
    * Debounce function calls
    */
   export function debounce(func, wait, immediate = false) {
     let timeout;
-    
+
     return function executedFunction(...args) {
       const later = () => {
         timeout = null;
         if (!immediate) func.apply(this, args);
       };
-      
+
       const callNow = immediate && !timeout;
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
-      
+
       if (callNow) func.apply(this, args);
     };
   }
-  
+
   /**
    * Throttle function calls
    */
   export function throttle(func, limit) {
     let inThrottle;
-    
+
     return function executedFunction(...args) {
       if (!inThrottle) {
         func.apply(this, args);
@@ -63,7 +63,7 @@ export function generateUUID() {
       }
     };
   }
-  
+
   /**
    * Deep clone an object
    */
@@ -71,15 +71,15 @@ export function generateUUID() {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
-    
+
     if (obj instanceof Date) {
       return new Date(obj.getTime());
     }
-    
+
     if (obj instanceof Array) {
       return obj.map(item => deepClone(item));
     }
-    
+
     if (typeof obj === 'object') {
       const clonedObj = {};
       for (const key in obj) {
@@ -90,7 +90,7 @@ export function generateUUID() {
       return clonedObj;
     }
   }
-  
+
   /**
    * Escape HTML entities
    */
@@ -99,7 +99,7 @@ export function generateUUID() {
     div.textContent = text;
     return div.innerHTML;
   }
-  
+
   /**
    * Parse file type from filename or extension
    */
@@ -107,9 +107,9 @@ export function generateUUID() {
     if (!filename || typeof filename !== 'string') {
       return 'txt';
     }
-    
+
     const extension = filename.split('.').pop().toLowerCase();
-    
+
     const typeMap = {
       'js': 'js',
       'jsx': 'jsx',
@@ -148,23 +148,23 @@ export function generateUUID() {
       'txt': 'txt',
       'text': 'txt'
     };
-    
+
     return typeMap[extension] || 'txt';
   }
-  
+
   /**
    * Format file size in human readable format
    */
   export function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
-  
+
   /**
    * Get language name from file type
    */
@@ -194,17 +194,17 @@ export function generateUUID() {
       'md': 'Markdown',
       'txt': 'Plain Text'
     };
-    
+
     return languageMap[fileType] || 'Unknown';
   }
-  
+
   /**
    * Check if the current environment supports WebSockets
    */
   export function isWebSocketSupported() {
     return typeof WebSocket !== 'undefined';
   }
-  
+
   /**
    * Get browser information
    */
@@ -212,7 +212,7 @@ export function generateUUID() {
     const userAgent = navigator.userAgent;
     let browser = 'Unknown';
     let version = 'Unknown';
-    
+
     if (userAgent.indexOf('Chrome') > -1) {
       browser = 'Chrome';
       version = userAgent.match(/Chrome\/(\d+)/)?.[1] || 'Unknown';
@@ -226,10 +226,10 @@ export function generateUUID() {
       browser = 'Edge';
       version = userAgent.match(/Edge\/(\d+)/)?.[1] || 'Unknown';
     }
-    
+
     return { browser, version, userAgent };
   }
-  
+
   /**
    * Simple localStorage wrapper with error handling
    */
@@ -242,7 +242,7 @@ export function generateUUID() {
         return defaultValue;
       }
     },
-    
+
     set(key, value) {
       try {
         localStorage.setItem(key, JSON.stringify(value));
@@ -251,7 +251,7 @@ export function generateUUID() {
         return false;
       }
     },
-    
+
     remove(key) {
       try {
         localStorage.removeItem(key);
@@ -260,7 +260,7 @@ export function generateUUID() {
         return false;
       }
     },
-    
+
     clear() {
       try {
         localStorage.clear();
@@ -270,14 +270,14 @@ export function generateUUID() {
       }
     }
   };
-  
+
   /**
    * Create a promise that resolves after a delay
    */
   export function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-  
+
   /**
    * Retry a function with exponential backoff
    */
@@ -288,25 +288,25 @@ export function generateUUID() {
       factor = 2,
       maxDelay = 10000
     } = options;
-    
+
     let lastError;
-    
+
     for (let i = 0; i <= retries; i++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error;
-        
+
         if (i === retries) {
           throw lastError;
         }
-        
+
         const delayMs = Math.min(baseDelay * Math.pow(factor, i), maxDelay);
         await delay(delayMs);
       }
     }
   }
-  
+
   /**
    * Check if a value is a valid UUID
    */
@@ -314,7 +314,7 @@ export function generateUUID() {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
   }
-  
+
   /**
    * Safe JSON parse with error handling
    */
@@ -325,7 +325,7 @@ export function generateUUID() {
       return defaultValue;
     }
   }
-  
+
   /**
    * Safe JSON stringify with error handling
    */
@@ -336,24 +336,23 @@ export function generateUUID() {
       return defaultValue;
     }
   }
-  
+
   /**
    * Create a cancellable promise
    */
   export function createCancellablePromise(promise) {
     let cancelled = false;
-    
+
     const cancellablePromise = new Promise((resolve, reject) => {
       promise.then(
         value => cancelled ? reject(new Error('Promise cancelled')) : resolve(value),
         error => cancelled ? reject(new Error('Promise cancelled')) : reject(error)
       );
     });
-    
+
     cancellablePromise.cancel = () => {
       cancelled = true;
     };
-    
+
     return cancellablePromise;
   }
-  

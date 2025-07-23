@@ -30,7 +30,7 @@
     if (!url || typeof url !== 'string') {
       return false;
     }
-    
+
     try {
       const urlObj = new URL(url);
       return urlObj.protocol === 'ws:' || urlObj.protocol === 'wss:';
@@ -44,17 +44,17 @@
    */
   function debounce(func, wait, immediate = false) {
     let timeout;
-    
+
     return function executedFunction(...args) {
       const later = () => {
         timeout = null;
         if (!immediate) func.apply(this, args);
       };
-      
+
       const callNow = immediate && !timeout;
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
-      
+
       if (callNow) func.apply(this, args);
     };
   }
@@ -87,10 +87,10 @@
       };
 
       const config = { ...defaultOptions, ...options };
-      
+
       this._initializeStyles(config.style);
       this._injectButtonsForSelector(config);
-      
+
       if (config.watchForChanges) {
         this._watchForDOMChanges(config);
       }
@@ -115,9 +115,9 @@
       };
 
       const config = { ...defaultOptions, ...options };
-      
+
       this._initializeStyles(config.style);
-      
+
       if (!textareaElement.id) {
         textareaElement.id = 'web-ide-bridge-textarea-' + generateUUID();
       }
@@ -132,10 +132,10 @@
         }
       });
       this.injectedButtons.clear();
-      
+
       this.observers.forEach(observer => observer.disconnect());
       this.observers = [];
-      
+
       if (this.styles && this.styles.parentNode) {
         this.styles.parentNode.removeChild(this.styles);
         this.styles = null;
@@ -153,12 +153,12 @@
 
     _initializeStyles(style) {
       if (this.styles || this.initialized) return;
-      
+
       const styleElement = document.createElement('style');
       styleElement.id = 'web-ide-bridge-styles';
-      
+
       let css = '';
-      
+
       switch (style) {
         case 'modern':
           css = this._getModernButtonStyles();
@@ -169,7 +169,7 @@
         default:
           css = this._getModernButtonStyles();
       }
-      
+
       styleElement.textContent = css;
       document.head.appendChild(styleElement);
       this.styles = styleElement;
@@ -196,27 +196,27 @@
           text-decoration: none;
           outline: none;
         }
-        
+
         .web-ide-bridge-btn:hover:not(:disabled) {
           transform: translateY(-1px);
           box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
         }
-        
+
         .web-ide-bridge-btn:active:not(:disabled) {
           transform: translateY(0);
         }
-        
+
         .web-ide-bridge-btn:disabled {
           background: #9ca3af;
           cursor: not-allowed;
           transform: none;
           box-shadow: none;
         }
-        
+
         .web-ide-bridge-btn:focus {
           box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
         }
-        
+
         .web-ide-bridge-container {
           display: flex;
           gap: 0.75rem;
@@ -224,7 +224,7 @@
           margin-top: 0.5rem;
           flex-wrap: wrap;
         }
-        
+
         .web-ide-bridge-file-type {
           padding: 0.5rem;
           border: 1px solid #d1d5db;
@@ -250,25 +250,25 @@
           font-family: inherit;
           outline: none;
         }
-        
+
         .web-ide-bridge-btn:hover:not(:disabled) {
           background: #4338ca;
         }
-        
+
         .web-ide-bridge-btn:disabled {
           background: #9ca3af;
           border-color: #9ca3af;
           cursor: not-allowed;
         }
-        
+
         .web-ide-bridge-btn:focus {
           box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
         }
-        
+
         .web-ide-bridge-container {
           margin-top: 0.5rem;
         }
-        
+
         .web-ide-bridge-file-type {
           margin-left: 0.5rem;
           padding: 0.25rem 0.5rem;
@@ -281,7 +281,7 @@
 
     _injectButtonsForSelector(config) {
       let elements = document.querySelectorAll(config.selector);
-      
+
       elements = Array.from(elements).filter(element => {
         if (config.excludeSelector && element.matches(config.excludeSelector)) {
           return false;
@@ -296,13 +296,13 @@
         if (!textarea.id) {
           textarea.id = 'web-ide-bridge-textarea-' + generateUUID();
         }
-        
+
         if (this.injectedButtons.has(textarea.id)) {
           return;
         }
 
         const fileType = textarea.getAttribute(config.fileTypeAttribute) || config.defaultFileType;
-        
+
         this._createAndInjectButton(textarea, {
           ...config,
           fileType
@@ -313,7 +313,7 @@
     _createAndInjectButton(textarea, config) {
       const container = document.createElement('div');
       container.className = 'web-ide-bridge-container';
-      
+
       const button = document.createElement('button');
       button.className = config.buttonClass;
       button.textContent = config.buttonText;
@@ -321,11 +321,11 @@
       button.dataset.fileType = config.fileType;
       button.dataset.originalText = config.buttonText;
       button.disabled = !this.webIdeBridge.isConnected();
-      
+
       const fileTypeSelect = document.createElement('select');
       fileTypeSelect.className = 'web-ide-bridge-file-type';
       fileTypeSelect.value = config.fileType;
-      
+
       const fileTypes = [
         { value: 'txt', label: 'Text (.txt)' },
         { value: 'js', label: 'JavaScript (.js)' },
@@ -351,24 +351,24 @@
         { value: 'sql', label: 'SQL (.sql)' },
         { value: 'md', label: 'Markdown (.md)' }
       ];
-      
+
       fileTypes.forEach(type => {
         const option = document.createElement('option');
         option.value = type.value;
         option.textContent = type.label;
         fileTypeSelect.appendChild(option);
       });
-      
+
       fileTypeSelect.addEventListener('change', () => {
         button.dataset.fileType = fileTypeSelect.value;
       });
-      
+
       button.addEventListener('click', async () => {
         if (!this.webIdeBridge.isConnected()) {
           alert('Please connect to Web-IDE-Bridge server first');
           return;
         }
-        
+
         try {
           const code = textarea.value;
           const fileType = button.dataset.fileType;
@@ -378,10 +378,10 @@
           alert('Failed to send code to IDE: ' + error.message);
         }
       });
-      
+
       container.appendChild(button);
       container.appendChild(fileTypeSelect);
-      
+
       switch (config.position) {
         case 'before':
           textarea.parentNode.insertBefore(container, textarea);
@@ -395,20 +395,20 @@
         default:
           textarea.parentNode.insertBefore(container, textarea.nextSibling);
       }
-      
+
       this.injectedButtons.set(textarea.id, button);
-      
+
       this.webIdeBridge.onStatusChange((status) => {
         this.updateButtonStates(status === 'connected');
       });
-      
+
       return button;
     }
 
     _watchForDOMChanges(config) {
       const observer = new MutationObserver((mutations) => {
         let shouldRefresh = false;
-        
+
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList') {
             mutation.addedNodes.forEach((node) => {
@@ -422,19 +422,19 @@
             });
           }
         });
-        
+
         if (shouldRefresh) {
           setTimeout(() => {
             this._injectButtonsForSelector(config);
           }, 100);
         }
       });
-      
+
       observer.observe(document.body, {
         childList: true,
         subtree: true
       });
-      
+
       this.observers.push(observer);
     }
   }
@@ -450,7 +450,7 @@
       }
 
       this.userId = userId;
-      this.connectionId = generateUUID();
+      this.connectionId = options.connectionId || generateUUID();
       this.options = {
         serverUrl: 'ws://localhost:8071/web-ide-bridge/ws',
         autoReconnect: true,
@@ -507,15 +507,15 @@
 
     disconnect() {
       this._log('Disconnecting from server');
-      
+
       this._clearTimeouts();
       this.options.autoReconnect = false;
-      
+
       if (this.ws) {
         this.ws.close(1000, 'Client disconnect');
         this.ws = null;
       }
-      
+
       this.connected = false;
       this.connecting = false;
       this._updateStatus('disconnected');
@@ -545,7 +545,7 @@
       }
 
       const sessionId = generateUUID();
-      
+
       const message = {
         type: 'edit_request',
         connectionId: this.connectionId,
@@ -561,7 +561,7 @@
 
       this._log('Sending edit request', { textareaId, fileType, sessionId });
       this._sendMessage(message);
-      
+
       return sessionId;
     }
 
@@ -601,9 +601,9 @@
       return new Promise((resolve, reject) => {
         try {
           this._log('Establishing WebSocket connection', { url: this.options.serverUrl });
-          
+
           this.ws = new WebSocket(this.options.serverUrl);
-          
+
           this.connectionTimeout = setTimeout(() => {
             if (this.ws.readyState !== WebSocket.OPEN) {
               this.ws.close();
@@ -643,16 +643,25 @@
       this.connected = true;
       this.connecting = false;
       this._updateStatus('connected');
+      // Send browser_connect immediately
+      const connectMessage = {
+        type: 'browser_connect',
+        connectionId: this.connectionId,
+        userId: this.userId,
+        timestamp: Date.now()
+      };
+      this._sendMessage(connectMessage);
+      this._startHeartbeat();
     }
 
     _handleConnectionClose(event) {
       this._log('WebSocket connection closed', { code: event.code, reason: event.reason });
-      
+
       this.connected = false;
       this.connecting = false;
       this._clearTimeouts();
       this._updateStatus('disconnected');
-      
+
       if (this.options.autoReconnect && event.code !== 1000) {
         this._scheduleReconnect();
       }
@@ -661,7 +670,7 @@
     _handleConnectionError(error) {
       this._log('Connection error', error);
       this._triggerErrorCallbacks(error.message || 'Connection failed');
-      
+
       if (this.options.autoReconnect) {
         this._scheduleReconnect();
       }
@@ -671,7 +680,7 @@
       try {
         const message = JSON.parse(event.data);
         this._log('Received message', message);
-        
+
         this.messageCallbacks.forEach(callback => {
           try {
             callback(message);
@@ -679,32 +688,32 @@
             this._log('Error in message callback', error);
           }
         });
-        
+
         switch (message.type) {
           case 'connection_init':
             this._handleConnectionInit(message);
             break;
-            
+
           case 'connection_ack':
             this._log('Connection acknowledged by server');
             break;
-            
+
           case 'code_update':
             this._handleCodeUpdate(message);
             break;
-            
+
           case 'pong':
             this._log('Received pong from server');
             break;
-            
+
           case 'error':
             this._handleServerError(message);
             break;
-            
+
           default:
             this._log('Unknown message type', message.type);
         }
-        
+
       } catch (error) {
         this._log('Error parsing message', error);
         this._log('Raw message data', event.data);
@@ -716,15 +725,7 @@
       if (message.connectionId) {
         this.connectionId = message.connectionId;
         this._log('Connection ID updated from server', this.connectionId);
-        
-        const connectMessage = {
-          type: 'browser_connect',
-          connectionId: this.connectionId,
-          userId: this.userId,
-          timestamp: Date.now()
-        };
-        
-        this._sendMessage(connectMessage);
+        // No need to send browser_connect here anymore
         this._startHeartbeat();
       }
     }
@@ -737,7 +738,7 @@
 
       const { textareaId, code } = message.payload;
       this._log('Received code update', { textareaId, codeLength: code.length });
-      
+
       this.codeUpdateCallbacks.forEach(callback => {
         try {
           callback(textareaId, code);
@@ -769,7 +770,7 @@
 
     _startHeartbeat() {
       this._clearHeartbeat();
-      
+
       if (this.options.heartbeatInterval > 0) {
         this.heartbeatTimeout = setTimeout(() => {
           if (this.connected) {
@@ -808,7 +809,7 @@
       );
 
       this._log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
-      
+
       this.reconnectTimeout = setTimeout(() => {
         this.debouncedReconnect();
       }, delay);
@@ -821,7 +822,7 @@
 
       this.reconnectAttempts++;
       this._log(`Reconnect attempt ${this.reconnectAttempts}`);
-      
+
       try {
         await this.connect();
       } catch (error) {
@@ -837,18 +838,18 @@
         clearTimeout(this.reconnectTimeout);
         this.reconnectTimeout = null;
       }
-      
+
       if (this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      
+
       this._clearHeartbeat();
     }
 
     _updateStatus(status) {
       this._log('Status changed to', status);
-      
+
       this.statusCallbacks.forEach(callback => {
         try {
           callback(status);

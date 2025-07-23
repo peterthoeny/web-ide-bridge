@@ -31,10 +31,10 @@ export class UIManager {
     };
 
     const config = { ...defaultOptions, ...options };
-    
+
     this._initializeStyles(config.style);
     this._injectButtonsForSelector(config);
-    
+
     if (config.watchForChanges) {
       this._watchForDOMChanges(config);
     }
@@ -62,9 +62,9 @@ export class UIManager {
     };
 
     const config = { ...defaultOptions, ...options };
-    
+
     this._initializeStyles(config.style);
-    
+
     // Generate ID if textarea doesn't have one
     if (!textareaElement.id) {
       textareaElement.id = 'web-ide-bridge-textarea-' + generateUUID();
@@ -83,11 +83,11 @@ export class UIManager {
       }
     });
     this.injectedButtons.clear();
-    
+
     // Stop observers
     this.observers.forEach(observer => observer.disconnect());
     this.observers = [];
-    
+
     // Remove styles
     if (this.styles && this.styles.parentNode) {
       this.styles.parentNode.removeChild(this.styles);
@@ -125,12 +125,12 @@ export class UIManager {
    */
   _initializeStyles(style) {
     if (this.styles || this.initialized) return;
-    
+
     const styleElement = document.createElement('style');
     styleElement.id = 'web-ide-bridge-styles';
-    
+
     let css = '';
-    
+
     switch (style) {
       case 'modern':
         css = this._getModernButtonStyles();
@@ -141,7 +141,7 @@ export class UIManager {
       default:
         css = this._getModernButtonStyles();
     }
-    
+
     styleElement.textContent = css;
     document.head.appendChild(styleElement);
     this.styles = styleElement;
@@ -171,27 +171,27 @@ export class UIManager {
         text-decoration: none;
         outline: none;
       }
-      
+
       .web-ide-bridge-btn:hover:not(:disabled) {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
       }
-      
+
       .web-ide-bridge-btn:active:not(:disabled) {
         transform: translateY(0);
       }
-      
+
       .web-ide-bridge-btn:disabled {
         background: #9ca3af;
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
       }
-      
+
       .web-ide-bridge-btn:focus {
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
       }
-      
+
       .web-ide-bridge-container {
         display: flex;
         gap: 0.75rem;
@@ -199,7 +199,7 @@ export class UIManager {
         margin-top: 0.5rem;
         flex-wrap: wrap;
       }
-      
+
       .web-ide-bridge-file-type {
         padding: 0.5rem;
         border: 1px solid #d1d5db;
@@ -228,25 +228,25 @@ export class UIManager {
         font-family: inherit;
         outline: none;
       }
-      
+
       .web-ide-bridge-btn:hover:not(:disabled) {
         background: #4338ca;
       }
-      
+
       .web-ide-bridge-btn:disabled {
         background: #9ca3af;
         border-color: #9ca3af;
         cursor: not-allowed;
       }
-      
+
       .web-ide-bridge-btn:focus {
         box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
       }
-      
+
       .web-ide-bridge-container {
         margin-top: 0.5rem;
       }
-      
+
       .web-ide-bridge-file-type {
         margin-left: 0.5rem;
         padding: 0.25rem 0.5rem;
@@ -262,7 +262,7 @@ export class UIManager {
    */
   _injectButtonsForSelector(config) {
     let elements = document.querySelectorAll(config.selector);
-    
+
     // Filter by include/exclude selectors
     elements = Array.from(elements).filter(element => {
       if (config.excludeSelector && element.matches(config.excludeSelector)) {
@@ -278,14 +278,14 @@ export class UIManager {
       if (!textarea.id) {
         textarea.id = 'web-ide-bridge-textarea-' + generateUUID();
       }
-      
+
       // Skip if button already exists
       if (this.injectedButtons.has(textarea.id)) {
         return;
       }
 
       const fileType = textarea.getAttribute(config.fileTypeAttribute) || config.defaultFileType;
-      
+
       this._createAndInjectButton(textarea, {
         ...config,
         fileType
@@ -299,7 +299,7 @@ export class UIManager {
   _createAndInjectButton(textarea, config) {
     const container = document.createElement('div');
     container.className = 'web-ide-bridge-container';
-    
+
     const button = document.createElement('button');
     button.className = config.buttonClass;
     button.textContent = config.buttonText;
@@ -307,12 +307,12 @@ export class UIManager {
     button.dataset.fileType = config.fileType;
     button.dataset.originalText = config.buttonText;
     button.disabled = !this.webIdeBridge.isConnected();
-    
+
     // File type selector
     const fileTypeSelect = document.createElement('select');
     fileTypeSelect.className = 'web-ide-bridge-file-type';
     fileTypeSelect.value = config.fileType;
-    
+
     // Common file types
     const fileTypes = [
       { value: 'txt', label: 'Text (.txt)' },
@@ -339,26 +339,26 @@ export class UIManager {
       { value: 'sql', label: 'SQL (.sql)' },
       { value: 'md', label: 'Markdown (.md)' }
     ];
-    
+
     fileTypes.forEach(type => {
       const option = document.createElement('option');
       option.value = type.value;
       option.textContent = type.label;
       fileTypeSelect.appendChild(option);
     });
-    
+
     // Update button file type when selector changes
     fileTypeSelect.addEventListener('change', () => {
       button.dataset.fileType = fileTypeSelect.value;
     });
-    
+
     // Button click handler
     button.addEventListener('click', async () => {
       if (!this.webIdeBridge.isConnected()) {
         alert('Please connect to Web-IDE-Bridge server first');
         return;
       }
-      
+
       try {
         const code = textarea.value;
         const fileType = button.dataset.fileType;
@@ -368,10 +368,10 @@ export class UIManager {
         alert('Failed to send code to IDE: ' + error.message);
       }
     });
-    
+
     container.appendChild(button);
     container.appendChild(fileTypeSelect);
-    
+
     // Position the container
     switch (config.position) {
       case 'before':
@@ -386,14 +386,14 @@ export class UIManager {
       default:
         textarea.parentNode.insertBefore(container, textarea.nextSibling);
     }
-    
+
     this.injectedButtons.set(textarea.id, button);
-    
+
     // Update button state based on connection
     this.webIdeBridge.onStatusChange((status) => {
       this.updateButtonStates(status === 'connected');
     });
-    
+
     return button;
   }
 
@@ -403,7 +403,7 @@ export class UIManager {
   _watchForDOMChanges(config) {
     const observer = new MutationObserver((mutations) => {
       let shouldRefresh = false;
-      
+
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList') {
           // Check if any added nodes contain textareas
@@ -418,7 +418,7 @@ export class UIManager {
           });
         }
       });
-      
+
       if (shouldRefresh) {
         // Debounce refresh to avoid excessive calls
         setTimeout(() => {
@@ -426,12 +426,12 @@ export class UIManager {
         }, 100);
       }
     });
-    
+
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
-    
+
     this.observers.push(observer);
   }
 }
