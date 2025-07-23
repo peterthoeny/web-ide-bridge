@@ -19,25 +19,25 @@ class WebIdeBridgeServer {
   constructor() {
     this.config = this.loadConfiguration();
     this.validateConfiguration(this.config);
-    
+
     this.app = express();
     this.server = null;
     this.wss = null;
     this.wsOptions = null;
-    
+
     // Connection tracking
     this.browserConnections = new Map(); // connectionId -> {ws, userId, sessionInfo}
     this.desktopConnections = new Map(); // connectionId -> {ws, userId}
     this.userSessions = new Map();       // userId -> {browserId, desktopId}
     this.activeSessions = new Map();     // sessionId -> {userId, textareaId, browserConnectionId}
-    
+
     // Rate limiting store
     this.rateLimitStore = new Map();
-    
+
     // Cleanup intervals
     this.cleanupInterval = null;
     this.heartbeatInterval = null;
-    
+
     // Process event handlers (store references for cleanup)
     this.processHandlers = {
       uncaughtException: null,
@@ -45,7 +45,7 @@ class WebIdeBridgeServer {
       SIGTERM: null,
       SIGINT: null
     };
-    
+
     // Metrics
     this.metrics = {
       totalConnections: 0,
@@ -55,7 +55,7 @@ class WebIdeBridgeServer {
       errors: 0,
       startTime: Date.now()
     };
-    
+
     this.setupCleanupScheduler();
   }
 
@@ -159,7 +159,7 @@ class WebIdeBridgeServer {
     };
 
     const finalConfig = fileConfig ? this.mergeConfig(defaultConfig, fileConfig) : defaultConfig;
-    
+
     console.log(`Configuration loaded from: ${configSource}`);
     if (finalConfig.debug) {
       console.log('Final configuration:', JSON.stringify(finalConfig, null, 2));
@@ -173,7 +173,7 @@ class WebIdeBridgeServer {
    */
   mergeConfig(defaultConfig, fileConfig) {
     const merged = { ...defaultConfig };
-    
+
     for (const [key, value] of Object.entries(fileConfig)) {
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         merged[key] = { ...merged[key], ...value };
@@ -181,7 +181,7 @@ class WebIdeBridgeServer {
         merged[key] = value;
       }
     }
-    
+
     return merged;
   }
 
@@ -193,55 +193,55 @@ class WebIdeBridgeServer {
     if (config.server.port < 0 || config.server.port > 65535) {
       throw new Error('Server port must be between 0 and 65535');
     }
-    
+
     if (config.server.heartbeatInterval < 1000) {
       throw new Error('Heartbeat interval must be at least 1000ms');
     }
-    
+
     if (!config.server.websocketEndpoint.startsWith('/')) {
       throw new Error('WebSocket endpoint must start with /');
     }
-    
+
     if (config.server.maxConnections < 1) {
       throw new Error('Max connections must be at least 1');
     }
-    
+
     if (config.server.connectionTimeout < 1000) {
       throw new Error('Connection timeout must be at least 1000ms');
     }
-    
+
     // Session validation
     if (config.environment === 'production') {
       if (config.session.secret === 'web-ide-bridge-secret' || 
           config.session.secret === 'change-this-in-production-use-env-var') {
         throw new Error('Session secret must be changed in production');
       }
-      
+
       if (!config.session.cookie.secure) {
         console.warn('Warning: Session cookies should be secure in production');
       }
     }
-    
+
     if (config.session.cookie.maxAge < 60000) {
       throw new Error('Session cookie maxAge must be at least 1 minute');
     }
-    
+
     // CORS validation
     if (!Array.isArray(config.cors.origin)) {
       throw new Error('CORS origin must be an array');
     }
-    
+
     // Rate limiting validation
     if (config.security.rateLimiting.enabled) {
       if (config.security.rateLimiting.windowMs < 1000) {
         throw new Error('Rate limiting window must be at least 1000ms');
       }
-      
+
       if (config.security.rateLimiting.maxRequests < 1) {
         throw new Error('Rate limiting max requests must be at least 1');
       }
     }
-    
+
     return true;
   }
 
@@ -278,7 +278,7 @@ class WebIdeBridgeServer {
           return { valid: false, error: 'userId must be 255 characters or less' };
         }
         break;
-        
+
       case 'edit_request':
         if (!message.userId || !message.sessionId || !message.payload) {
           return { valid: false, error: 'edit_request requires userId, sessionId, and payload' };
@@ -290,7 +290,7 @@ class WebIdeBridgeServer {
           return { valid: false, error: 'Code payload too large (max 10MB)' };
         }
         break;
-        
+
       case 'code_update':
         if (!message.sessionId || !message.payload) {
           return { valid: false, error: 'code_update requires sessionId and payload' };
@@ -318,7 +318,7 @@ class WebIdeBridgeServer {
     const maxRequests = this.config.security.rateLimiting.maxRequests;
 
     let record = this.rateLimitStore.get(key);
-    
+
     if (!record) {
       record = { requests: [], resetTime: now + windowMs };
       this.rateLimitStore.set(key, record);
@@ -326,13 +326,13 @@ class WebIdeBridgeServer {
 
     // Remove old requests outside the window
     record.requests = record.requests.filter(timestamp => now - timestamp < windowMs);
-    
+
     // Add current request
     record.requests.push(now);
-    
+
     // Update reset time
     record.resetTime = now + windowMs;
-    
+
     return record.requests.length <= maxRequests;
   }
 
@@ -345,7 +345,7 @@ class WebIdeBridgeServer {
       this.setupWebSocket();
       this.setupRoutes();
       this.setupErrorHandling();
-      
+
       // Create server but don't log immediately (for testing)
       await new Promise((resolve, reject) => {
         this.server = this.app.listen(this.config.server.port, this.config.server.host, (error) => {
@@ -353,7 +353,7 @@ class WebIdeBridgeServer {
             reject(error);
             return;
           }
-          
+
           // Only log if not in test environment
           if (process.env.NODE_ENV !== 'test') {
             console.log(`Web-IDE-Bridge server v0.1.3 running on ${this.config.server.host}:${this.config.server.port}`);
@@ -361,7 +361,7 @@ class WebIdeBridgeServer {
             console.log(`Environment: ${this.config.environment}`);
             console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
           }
-          
+
           resolve();
         });
       });
@@ -374,7 +374,7 @@ class WebIdeBridgeServer {
 
       this.setupWebSocketHandlers();
       this.setupGracefulShutdown();
-      
+
     } catch (error) {
       console.error('Failed to start server:', error);
       throw error;
@@ -453,18 +453,46 @@ class WebIdeBridgeServer {
   /**
    * Handle new WebSocket connections
    */
-  handleConnection(ws, req) {
-    const connectionId = uuidv4();
-    const clientIP = req.socket.remoteAddress;
-    
-    this.metrics.totalConnections++;
-    
-    if (this.config.debug) {
-      console.log(`New WebSocket connection: ${connectionId} from ${clientIP}`);
+  /**
+   * Handle connection initialization from client
+   */
+  handleConnectionInit(ws, message) {
+    const { connectionId } = message;
+
+    if (!connectionId || typeof connectionId !== 'string') {
+      this.sendError(ws, 'Connection init requires connectionId');
+      return;
     }
 
-    // Set up connection properties
+    // Set the connectionId provided by the client
     ws.connectionId = connectionId;
+
+    if (this.config.debug) {
+      console.log(`Connection initialized with client connectionId: ${connectionId} from ${ws.clientIP}`);
+    }
+
+    // Send acknowledgment
+    this.sendMessage(ws, {
+      type: 'connection_ack',
+      connectionId: connectionId,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Handle new WebSocket connections
+   */
+  handleConnection(ws, req) {
+    // Don't assign connectionId yet - wait for client to send it
+    const clientIP = req.socket.remoteAddress;
+
+    this.metrics.totalConnections++;
+
+    if (this.config.debug) {
+      console.log(`New WebSocket connection from ${clientIP} (waiting for connectionId)`);
+    }
+
+    // Set up connection properties (but no connectionId yet)
     ws.isAlive = true;
     ws.connectedAt = Date.now();
     ws.clientIP = clientIP;
@@ -479,26 +507,41 @@ class WebIdeBridgeServer {
 
     // Connection timeout
     const connectionTimeout = setTimeout(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(1000, 'Connection timeout - no authentication');
+      if (ws.readyState === WebSocket.OPEN && !ws.connectionId) {
+        ws.close(1000, 'Connection timeout - no connectionId received');
       }
     }, this.config.server.connectionTimeout);
-
-    // Send initial connection info to client
-    this.sendMessage(ws, {
-      type: 'connection_init',
-      connectionId: connectionId,
-      timestamp: Date.now()
-    });
 
     // Message handling
     ws.on('message', (data) => {
       try {
         // Clear timeout once we receive a message
         clearTimeout(connectionTimeout);
-        
+
         const message = JSON.parse(data);
-        this.routeMessage(ws, message);
+        // Inline message routing logic
+        switch (message.type) {
+          case 'browser_connect':
+            this.handleBrowserConnect(ws, message);
+            break;
+          case 'desktop_connect':
+            this.handleDesktopConnect(ws, message);
+            break;
+          case 'edit_request':
+            this.handleEditRequest(ws, message);
+            break;
+          case 'code_update':
+            this.handleCodeUpdate(ws, message);
+            break;
+          case 'ping':
+            this.handlePing(ws, message);
+            break;
+          case 'connection_init':
+            this.handleConnectionInit(ws, message);
+            break;
+          default:
+            this.sendError(ws, `Unknown message type: ${message.type}`);
+        }
         this.metrics.messagesProcessed++;
       } catch (error) {
         this.handleError(ws, 'Invalid JSON message', error);
@@ -524,57 +567,12 @@ class WebIdeBridgeServer {
   }
 
   /**
-   * Route incoming WebSocket messages with enhanced validation
-   */
-  routeMessage(ws, message) {
-    // Enhanced message validation
-    const validation = this.validateMessage(message);
-    if (!validation.valid) {
-      this.sendError(ws, validation.error);
-      return;
-    }
-
-    // Validate connectionId matches
-    if (message.connectionId !== ws.connectionId) {
-      this.sendError(ws, 'Invalid connectionId: does not match connection');
-      return;
-    }
-
-    if (this.config.debug) {
-      console.log(`Routing message: ${message.type} from ${ws.connectionId}`);
-    }
-
-    try {
-      switch (message.type) {
-        case 'browser_connect':
-          this.handleBrowserConnect(ws, message);
-          break;
-        case 'desktop_connect':
-          this.handleDesktopConnect(ws, message);
-          break;
-        case 'edit_request':
-          this.handleEditRequest(ws, message);
-          break;
-        case 'code_update':
-          this.handleCodeUpdate(ws, message);
-          break;
-        case 'ping':
-          this.handlePing(ws, message);
-          break;
-        default:
-          this.sendError(ws, `Unknown message type: ${message.type}`);
-      }
-    } catch (error) {
-      this.handleError(ws, `Error processing ${message.type}`, error);
-    }
-  }
-
-  /**
    * Handle browser client connection
    */
   handleBrowserConnect(ws, message) {
-    const { userId } = message;
-    
+    const { userId, connectionId } = message;
+    ws.connectionId = connectionId;
+
     if (!userId) {
       this.sendError(ws, 'Browser connection requires userId');
       return;
@@ -612,8 +610,9 @@ class WebIdeBridgeServer {
    * Handle desktop client connection
    */
   handleDesktopConnect(ws, message) {
-    const { userId } = message;
-    
+    const { userId, connectionId } = message;
+    ws.connectionId = connectionId;
+
     if (!userId) {
       this.sendError(ws, 'Desktop connection requires userId');
       return;
@@ -652,7 +651,7 @@ class WebIdeBridgeServer {
    */
   handleEditRequest(ws, message) {
     const { userId, sessionId, payload } = message;
-    
+
     if (!userId || !sessionId || !payload) {
       this.sendError(ws, 'Edit request requires userId, sessionId, and payload');
       return;
@@ -700,7 +699,7 @@ class WebIdeBridgeServer {
    */
   handleCodeUpdate(ws, message) {
     const { sessionId, payload } = message;
-    
+
     if (!sessionId || !payload) {
       this.sendError(ws, 'Code update requires sessionId and payload');
       return;
@@ -760,7 +759,7 @@ class WebIdeBridgeServer {
     if (this.browserConnections.has(ws.connectionId)) {
       const browserConn = this.browserConnections.get(ws.connectionId);
       this.browserConnections.delete(ws.connectionId);
-      
+
       // Update user session
       const userSession = this.userSessions.get(browserConn.userId);
       if (userSession && userSession.browserId === ws.connectionId) {
@@ -775,7 +774,7 @@ class WebIdeBridgeServer {
     if (this.desktopConnections.has(ws.connectionId)) {
       const desktopConn = this.desktopConnections.get(ws.connectionId);
       this.desktopConnections.delete(ws.connectionId);
-      
+
       // Update user session
       const userSession = this.userSessions.get(desktopConn.userId);
       if (userSession && userSession.desktopId === ws.connectionId) {
@@ -817,11 +816,11 @@ class WebIdeBridgeServer {
    */
   sendError(ws, message, code = 'ERROR') {
     this.metrics.errors++;
-    
+
     if (this.config.debug) {
       console.error(`Error: ${message} (connection: ${ws.connectionId})`);
     }
-    
+
     this.sendMessage(ws, {
       type: 'error',
       payload: { message, code }
@@ -834,7 +833,7 @@ class WebIdeBridgeServer {
   handleError(ws, context, error) {
     this.metrics.errors++;
     console.error(`${context} (connection: ${ws.connectionId}):`, error);
-    
+
     this.sendError(ws, `${context}: ${error.message}`);
   }
 
@@ -845,13 +844,13 @@ class WebIdeBridgeServer {
     const uptime = process.uptime();
     const uptimeFormatted = this.formatUptime(uptime);
     const memoryUsage = process.memoryUsage();
-    
+
     const connectionStatus = this.browserConnections.size > 0 || this.desktopConnections.size > 0 
       ? 'active' 
       : 'waiting';
-    
+
     const statusColor = connectionStatus === 'active' ? '#10b981' : '#f59e0b';
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -865,7 +864,7 @@ class WebIdeBridgeServer {
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -875,7 +874,7 @@ class WebIdeBridgeServer {
             justify-content: center;
             color: #333;
         }
-        
+
         .container {
             background: white;
             border-radius: 16px;
@@ -885,26 +884,26 @@ class WebIdeBridgeServer {
             width: 90%;
             margin: 2rem;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 2rem;
             border-bottom: 2px solid #f3f4f6;
             padding-bottom: 1.5rem;
         }
-        
+
         .title {
             font-size: 2rem;
             font-weight: 700;
             color: #1f2937;
             margin-bottom: 0.5rem;
         }
-        
+
         .subtitle {
             color: #6b7280;
             font-size: 1rem;
         }
-        
+
         .status-badge {
             display: inline-block;
             padding: 0.5rem 1rem;
@@ -917,21 +916,21 @@ class WebIdeBridgeServer {
             margin-top: 1rem;
             background-color: ${statusColor};
         }
-        
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
-        
+
         .card {
             background: #f9fafb;
             border-radius: 12px;
             padding: 1.5rem;
             border: 1px solid #e5e7eb;
         }
-        
+
         .card-title {
             font-size: 1.125rem;
             font-weight: 600;
@@ -941,11 +940,11 @@ class WebIdeBridgeServer {
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .card-content {
             space-y: 0.75rem;
         }
-        
+
         .metric {
             display: flex;
             justify-content: space-between;
@@ -953,21 +952,21 @@ class WebIdeBridgeServer {
             padding: 0.5rem 0;
             border-bottom: 1px solid #e5e7eb;
         }
-        
+
         .metric:last-child {
             border-bottom: none;
         }
-        
+
         .metric-label {
             color: #6b7280;
             font-size: 0.875rem;
         }
-        
+
         .metric-value {
             font-weight: 600;
             color: #1f2937;
         }
-        
+
         .metric-value.number {
             font-family: 'Monaco', 'Menlo', monospace;
             background: #e5e7eb;
@@ -975,7 +974,7 @@ class WebIdeBridgeServer {
             border-radius: 6px;
             font-size: 0.875rem;
         }
-        
+
         .footer {
             text-align: center;
             margin-top: 2rem;
@@ -984,17 +983,17 @@ class WebIdeBridgeServer {
             color: #6b7280;
             font-size: 0.875rem;
         }
-        
+
         .footer a {
             color: #4f46e5;
             text-decoration: none;
             margin: 0 1rem;
         }
-        
+
         .footer a:hover {
             text-decoration: underline;
         }
-        
+
         .version {
             background: #4f46e5;
             color: white;
@@ -1003,17 +1002,17 @@ class WebIdeBridgeServer {
             font-size: 0.75rem;
             font-weight: 600;
         }
-        
+
         @media (max-width: 640px) {
             .container {
                 margin: 1rem;
                 padding: 1.5rem;
             }
-            
+
             .title {
                 font-size: 1.5rem;
             }
-            
+
             .grid {
                 grid-template-columns: 1fr;
             }
@@ -1028,7 +1027,7 @@ class WebIdeBridgeServer {
             <span class="version">v0.1.3</span>
             <div class="status-badge">${connectionStatus}</div>
         </div>
-        
+
         <div class="grid">
             <div class="card">
                 <h2 class="card-title">🔗 Connections</h2>
@@ -1051,7 +1050,7 @@ class WebIdeBridgeServer {
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h2 class="card-title">📝 Sessions</h2>
                 <div class="card-content">
@@ -1069,7 +1068,7 @@ class WebIdeBridgeServer {
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h2 class="card-title">📊 Performance</h2>
                 <div class="card-content">
@@ -1091,7 +1090,7 @@ class WebIdeBridgeServer {
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h2 class="card-title">⚙️ Configuration</h2>
                 <div class="card-content">
@@ -1114,7 +1113,7 @@ class WebIdeBridgeServer {
                 </div>
             </div>
         </div>
-        
+
         <div class="footer">
             <p>
                 <a href="${this.config.endpoints?.health || '/web-ide-bridge/health'}">Health Check</a>
@@ -1126,7 +1125,7 @@ class WebIdeBridgeServer {
             </p>
         </div>
     </div>
-    
+
     <script>
         // Auto-refresh every 30 seconds
         setTimeout(() => {
@@ -1145,7 +1144,7 @@ class WebIdeBridgeServer {
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    
+
     if (days > 0) {
       return `${days}d ${hours}h ${minutes}m`;
     } else if (hours > 0) {
@@ -1181,7 +1180,7 @@ class WebIdeBridgeServer {
       const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
       const userAgent = req.headers['user-agent'] || '';
       const isApiCall = acceptsJson || userAgent.includes('node-fetch') || userAgent.includes('curl');
-      
+
       if (isApiCall) {
         // Return JSON for API calls and tests
         res.json({
@@ -1278,14 +1277,14 @@ class WebIdeBridgeServer {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
-    
+
     this.heartbeatInterval = setInterval(() => {
       this.wss.clients.forEach((ws) => {
         if (!ws.isAlive) {
           ws.terminate();
           return;
         }
-        
+
         ws.isAlive = false;
         ws.ping();
       });
@@ -1412,14 +1411,14 @@ class WebIdeBridgeServer {
   async shutdown() {
     try {
       console.log('Starting server shutdown...');
-      
+
       // Clear all intervals first
       if (this.cleanupInterval) {
         clearInterval(this.cleanupInterval);
         this.cleanupInterval = null;
         console.log('Cleared cleanup interval');
       }
-      
+
       if (this.heartbeatInterval) {
         clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = null;
@@ -1430,7 +1429,7 @@ class WebIdeBridgeServer {
       if (this.wss && this.wss.clients) {
         console.log(`Closing ${this.wss.clients.size} WebSocket connections...`);
         const closePromises = [];
-        
+
         this.wss.clients.forEach((ws) => {
           if (ws.readyState === 1) { // WebSocket.OPEN
             closePromises.push(new Promise((resolve) => {
@@ -1446,7 +1445,7 @@ class WebIdeBridgeServer {
             }));
           }
         });
-        
+
         await Promise.all(closePromises);
         console.log('All WebSocket connections closed');
       }
@@ -1504,10 +1503,10 @@ class WebIdeBridgeServer {
       this.removeProcessHandlers();
 
       console.log('Server shutdown complete');
-      
+
       // Give a moment for everything to settle
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
     } catch (error) {
       console.error('Error during shutdown:', error);
       throw error;
@@ -1520,11 +1519,11 @@ class WebIdeBridgeServer {
  */
 function main() {
   const args = process.argv.slice(2);
-  
+
   // Simple argument parsing
   let port = null;
   let configPath = null;
-  
+
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--port':
@@ -1546,19 +1545,19 @@ Options:
   -p, --port <port>      Port to listen on (default: 8071)
   -c, --config <path>    Path to configuration file
   -h, --help             Show this help message
-  
+
 Environment Variables:
   WEB_IDE_BRIDGE_PORT    Override port number
   WEB_IDE_BRIDGE_CONFIG  Path to configuration file
   WEB_IDE_BRIDGE_SECRET  Session secret (production)
   NODE_ENV               Environment (development/production)
   DEBUG                  Enable debug logging
-  
+
 Configuration Files (checked in order):
   1. $WEB_IDE_BRIDGE_CONFIG (if set)
   2. /etc/web-ide-bridge-server.conf
   3. ./web-ide-bridge-server.conf
-  
+
 Examples:
   web-ide-bridge-server
   web-ide-bridge-server --port 3000
@@ -1572,16 +1571,16 @@ Examples:
         process.exit(1);
     }
   }
-  
+
   // Set environment variables from CLI args
   if (port) {
     process.env.WEB_IDE_BRIDGE_PORT = port.toString();
   }
-  
+
   if (configPath) {
     process.env.WEB_IDE_BRIDGE_CONFIG = configPath;
   }
-  
+
   // Create and start server
   const server = new WebIdeBridgeServer();
   server.start().catch((error) => {
