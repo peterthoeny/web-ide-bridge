@@ -71,25 +71,18 @@ Web-IDE-Bridge/
 │       └── utils.js                    # Utility functions
 ├── desktop/                            # Desktop tier (Windows, macOS, Linux)
 │   ├── README.md                       # Points to repository root README
-│   ├── web-ide-bridge.conf             # Desktop app configuration
-│   ├── package.json                    # Node.js dependencies
+│   ├── package.json                    # Desktop app JS dependencies
 │   ├── package-lock.json               # Locked dependencies
 │   ├── tauri.conf.json                 # Tauri configuration
 │   ├── Cargo.toml                      # Rust dependencies
-│   ├── src/                            # Frontend source (TypeScript/JS)
-│   │   ├── main.ts                     # Main application entry
-│   │   ├── components/                 # UI components
-│   │   ├── services/                   # WebSocket and IDE services
-│   │   └── utils/                      # Utility functions
+│   ├── src/                            # Frontend (vanilla JS/HTML/CSS)
+│   │   ├── index.html                  # Main UI
+│   │   ├── main.js                     # Main JS entry
+│   │   └── ...                         # Other frontend files
 │   └── src-tauri/                      # Tauri Rust backend
 │       ├── Cargo.toml                  # Rust project configuration
-│       ├── build.rs                    # Build script
-│       ├── tauri.conf.json             # Tauri runtime configuration
-│       └── src/
-│           ├── main.rs                 # Main Rust application
-│           ├── commands.rs             # Tauri commands
-│           ├── ide.rs                  # IDE integration
-│           └── file_watcher.rs         # File monitoring
+│       ├── main.rs                     # Main Rust application
+│       └── ...                         # Other Rust backend files
 └── server/                             # Server-side tier
     ├── README.md                       # Points to repository root README
     ├── package.json                    # Node.js package configuration
@@ -212,6 +205,8 @@ DEBUG_TESTS=true npm test
 - ✅ **End-to-End:** Complete user workflows and multi-user scenarios
 
 ### 4. Install Desktop Application
+
+The desktop app is implemented using [Tauri](https://tauri.app/) for native performance and minimal resource usage. The frontend is vanilla JavaScript, HTML, and CSS.
 
 #### Option A: Download Pre-built Binaries
 Download and install the Web-IDE-Bridge desktop application for your platform:
