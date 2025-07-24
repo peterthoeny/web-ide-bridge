@@ -67,7 +67,7 @@ func defaultConfig() Config {
 // Returns config file path, ensures config dir exists
 func configPath() string {
 	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, ".web-ide-bridge-desktop")
+	dir := filepath.Join(home, ".web-ide-bridge")
 	os.MkdirAll(dir, 0700)
 	return filepath.Join(dir, "config.json")
 }
@@ -460,7 +460,7 @@ func main() {
 	cfg, _ := loadConfig()
 
 	a := app.New()
-	w := a.NewWindow("Web-IDE-Bridge Desktop")
+	w := a.NewWindow("Web-IDE-Bridge")
 	w.Resize(fyne.NewSize(700, 720)) // wider window
 
 	// Activity Log Section (improved contrast)
@@ -676,7 +676,7 @@ func main() {
 	editConfigBtn.Importance = widget.HighImportance
 
 	// Header with version badge
-	title := canvas.NewText("Web-IDE-Bridge Desktop", color.RGBA{80, 80, 220, 255})
+	title := canvas.NewText("Web-IDE-Bridge", color.RGBA{80, 80, 220, 255})
 	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.TextSize = 26
 	versionBadge := widget.NewLabel("v0.1.3")

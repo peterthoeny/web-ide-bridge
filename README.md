@@ -52,7 +52,6 @@ Web-IDE-Bridge/
 │   │   ├── integration.test.js         # Browser integration tests
 │   │   └── dom.test.js                 # DOM manipulation tests
 │   ├── desktop/                        # Desktop app tests
-│   │   ├── tauri.test.js               # Tauri integration tests
 │   │   ├── file-handling.test.js       # File operations tests
 │   │   └── ide-integration.test.js     # IDE launch and communication
 │   └── e2e/                            # End-to-end tests
@@ -69,20 +68,10 @@ Web-IDE-Bridge/
 │       ├── client.js                   # Main client implementation
 │       ├── ui.js                       # UI components and styling
 │       └── utils.js                    # Utility functions
-├── desktop/                            # Desktop tier (Windows, macOS, Linux)
-│   ├── README.md                       # Points to repository root README
-│   ├── package.json                    # Desktop app JS dependencies
-│   ├── package-lock.json               # Locked dependencies
-│   ├── tauri.conf.json                 # Tauri configuration
-│   ├── Cargo.toml                      # Rust dependencies
-│   ├── src/                            # Frontend (vanilla JS/HTML/CSS)
-│   │   ├── index.html                  # Main UI
-│   │   ├── main.js                     # Main JS entry
-│   │   └── ...                         # Other frontend files
-│   └── src-tauri/                      # Tauri Rust backend
-│       ├── Cargo.toml                  # Rust project configuration
-│       ├── main.rs                     # Main Rust application
-│       └── ...                         # Other Rust backend files
+├── desktop/                            # Desktop tier (Go/Fyne)
+│   ├── main.go                         # Main Go application
+│   ├── go.mod                          # Go module definition
+│   └── go.sum                          # Go module checksums
 └── server/                             # Server-side tier
     ├── README.md                       # Points to repository root README
     ├── package.json                    # Node.js package configuration
@@ -106,7 +95,7 @@ Web-IDE-Bridge consists of three components working together:
 
 1. **🌐 Web-IDE-Bridge JavaScript Library** - Integrates into web applications to provide "Edit in IDE ↗" buttons
 2. **🔗 Web-IDE-Bridge Server** - Node.js WebSocket server that routes messages between browser and desktop
-3. **🖥️ Web-IDE-Bridge Desktop App** - Cross-platform Tauri application that manages IDE integration
+3. **🖥️ Web-IDE-Bridge Desktop App** - Cross-platform Go/Fyne application that manages IDE integration
 
 ## Quick Start
 
@@ -114,7 +103,7 @@ Web-IDE-Bridge consists of three components working together:
 
 - **Node.js** (v14+ recommended, v18+ preferred)
 - **npm** or **yarn**
-- **Rust** (latest stable version for desktop application)
+- **Go** (latest stable version for desktop application)
 
 ### 1. Clone and Set Up the Project
 
@@ -137,9 +126,10 @@ npm install
 cd ..
 
 # Install desktop dependencies
+# (Optional) Download Go dependencies
 cd desktop
-npm install
-cd ..
+go mod tidy
+# Go will fetch dependencies automatically when you run or build the app
 ```
 
 ### 2. Start the Server
@@ -175,7 +165,7 @@ npm test
 # Run specific test suites
 npm run test:server         # Server functionality tests
 npm run test:browser        # Browser library tests
-npm run test:desktop        # Desktop app tests (future)
+npm run test:desktop        # Desktop app tests
 npm run test:e2e           # End-to-end integration tests
 
 # Performance and load testing
@@ -206,7 +196,7 @@ DEBUG_TESTS=true npm test
 
 ### 4. Install Desktop Application
 
-The desktop app is implemented using [Tauri](https://tauri.app/) for native performance and minimal resource usage. The frontend is vanilla JavaScript, HTML, and CSS.
+The desktop app is implemented in Go using the Fyne UI toolkit for native performance and minimal resource usage.
 
 #### Option A: Download Pre-built Binaries
 Download and install the Web-IDE-Bridge desktop application for your platform:
@@ -216,53 +206,13 @@ Download and install the Web-IDE-Bridge desktop application for your platform:
 
 #### Option B: Build from Source
 
-**macOS Build:**
+**macOS/Windows/Linux Build:**
 ```bash
 cd desktop
-npm install
-
-# Install Rust (if not already installed)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh
-source ~/.cargo/env
-
-# Install Tauri CLI
-npm install -g @tauri-apps/cli
-
-# Build the application
-npm run tauri build
-
-# Development mode
-npm run tauri dev
-```
-
-**Windows Build:**
-```bash
-cd desktop
-npm install
-
-# Install Rust (if not already installed)
-# Download from https://rustup.rs/ or use:
-winget install Rust.Rustup
-
-# Build the application
-npm run tauri build
-```
-
-**Linux Build:**
-```bash
-cd desktop
-npm install
-
-# Install Rust and dependencies
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh
-source ~/.cargo/env
-
-# Install system dependencies (Ubuntu/Debian)
-sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-# Build the application
-npm run tauri build
+# Run the desktop app in development mode
+go run main.go
+# Or build a binary for your platform
+go build -o web-ide-bridge main.go
 ```
 
 Configure your preferred IDE and WebSocket server URL on first launch.
@@ -383,37 +333,20 @@ Web-IDE-Bridge works with any IDE that can be launched from the command line:
 
 ### 🔧 Popular IDEs
 
-- **Visual Studio Code** (`code`) - Full IntelliSense and extension support
-- **Sublime Text** (`subl`) - Lightning-fast editing with powerful features
-- **Atom** (`atom`) - Hackable text editor with rich package ecosystem
-- **Vim/Neovim** (`vim`/`nvim`) - Modal editing with extensive customization
-- **Emacs** (`emacs`) - Extensible editor with powerful key bindings
-- **IntelliJ IDEA** (`idea`) - Full IDE features for multiple languages
-- **WebStorm** (`webstorm`) - JavaScript and web development focused
-- **PyCharm** (`pycharm`) - Python development environment
+- **Visual Studio Code** - Full IntelliSense and extension support
+- **Sublime Text** - Lightning-fast editing with powerful features
+- **Atom** - Hackable text editor with rich package ecosystem
+- **Vim/Neovim** - Modal editing with extensive customization
+- **Emacs** - Extensible editor with powerful key bindings
+- **IntelliJ IDEA** - Full IDE features for multiple languages
+- **WebStorm** - JavaScript and web development focused
+- **PyCharm** - Python development environment
 - **And many more...**
 
 ### ⚙️ IDE Configuration
 
-Configure your preferred IDE in the desktop application settings:
-
-```json
-{
-  "defaultIde": "code",
-  "ideCommands": {
-    "code": "code",
-    "sublime": "subl",
-    "vim": "vim",
-    "idea": "idea"
-  },
-  "ideArgs": {
-    "code": ["--wait", "--new-window"],
-    "sublime": ["--wait"],
-    "vim": ["+"],
-    "idea": ["--line", "1"]
-  }
-}
-```
+- Configure your preferred IDE using the desktop application's graphical user interface (GUI).
+- You can set the IDE command, WebSocket URL, and other preferences directly in the desktop app settings.
 
 ## Configuration
 
@@ -734,7 +667,7 @@ See the [LICENSE](LICENSE) file for complete details.
 ## 🙏 Acknowledgments
 
 - **WebSocket Technology**: Built on robust WebSocket implementations
-- **Tauri Framework**: Desktop app powered by Tauri for native performance
+- **Go/Fyne**: Desktop app powered by Go and Fyne for native performance
 - **Open Source Community**: Inspired by and built with open source tools
 - **Contributors**: Thanks to all who have contributed code, documentation, and feedback
 

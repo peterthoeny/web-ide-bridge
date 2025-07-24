@@ -28,8 +28,8 @@ Web-IDE-Bridge implements a three-tier architecture using WebSocket communicatio
            │ WebSocket
            │
 ┌──────────▼──────────────┐
-│     Desktop Client      │
-│ (Web-IDE-Bridge desktop)│
+│   Desktop Client App    │
+│    (Web-IDE-Bridge)     │
 │  - IDE integration      │
 │  - File monitoring      │
 │  - Process management   │
@@ -145,10 +145,8 @@ const defaultConfig = {
 ### 3. Web-IDE-Bridge Desktop Application
 
 **Technology Stack:**
-- **Go** for backend file system operations and process management
-- **Fyne** for cross-platform desktop application with native performance
-- **JavaScript/TypeScript** for frontend WebSocket connectivity
-- **Native WebView** for UI rendering with minimal resource usage
+- **Go** for backend file system operations, process management, and cross-platform desktop UI (using Fyne)
+- **JavaScript/TypeScript** for frontend WebSocket connectivity (browser)
 
 ## Development Workflow
 
@@ -169,11 +167,12 @@ npm run build  # Build for distribution
 npm run dev    # Development with live reload
 ```
 
-3. **Desktop App Development (Tauri):**
+3. **Desktop App Development (Go/Fyne):**
 ```bash
-cd web-ide-bridge-desktop
-npm install
-npm run tauri dev  # Development mode with hot reload
+cd desktop
+go run main.go  # Run the desktop app in development mode
+# or build a binary:
+go build -o web-ide-bridge main.go
 ```
 
 ### Build and Deployment
@@ -191,19 +190,11 @@ pm2 startup
 pm2 save
 ```
 
-**Desktop App Distribution (Tauri):**
+**Desktop App Distribution (Go/Fyne):**
 ```bash
-# Windows
-npm run tauri build -- --target x86_64-pc-windows-msvc
-
-# macOS (Intel)
-npm run tauri build -- --target x86_64-apple-darwin
-
-# macOS (Apple Silicon)
-npm run tauri build -- --target aarch64-apple-darwin
-
-# Linux
-npm run tauri build -- --target x86_64-unknown-linux-gnu
+# Build for your platform (from desktop/ directory)
+go build -o web-ide-bridge main.go
+# The resulting binary can be distributed for Windows, macOS, or Linux
 ```
 
 ## Security Considerations
@@ -489,4 +480,4 @@ docker run -d \
 
 This technical specification provides comprehensive implementation guidance for building a robust, scalable Web-IDE-Bridge system that can handle hundreds of concurrent users while maintaining responsive real-time synchronization between web browsers and desktop IDEs.
 
-The architecture emphasizes simplicity and reliability with a single-instance server approach, native desktop performance through Tauri, and comprehensive error handling and recovery mechanisms.
+The architecture emphasizes simplicity and reliability with a single-instance server approach, native desktop performance through Go , and comprehensive error handling and recovery mechanisms.
