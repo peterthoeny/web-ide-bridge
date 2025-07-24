@@ -452,3 +452,181 @@ Ready to connect to Web-IDE-Bridge server...
 ```
 
 ------------------------------
+
+now it connects properly.
+
+next task: change the demo as follows:
+- remove "Connect to Server" button
+- HTML page shows:
+  - getting started section (as is)
+  - new config section that defines three input fields for:
+    ```const conf = {
+      wsUrl: 'ws://localhost:8071/web-ide-bridge/ws',
+      user: 'peter',
+      reconnectTime: 10000
+    };```
+  - "Open Edit Demo ⬇" button, when clicked:
+    - button changes to "Close Edit Demo ⬆", when clicked:
+      - hide edit section
+      - close the server connection
+    - connect to server
+      - uuid should persists until page reload (e.g. use same uuid when opening the edit demo again)
+      - try to reconnect on disconnect or connection error
+    - show edit section below "Open/Close Edit Demo" button (to simulate dialog box) showing:
+      - only two textedit fields, with hard coded type:
+        - JavaScript Code
+        - HTML Template
+  - status section showing:
+    - browser to server connection
+    - server to dektop connection (for current user)
+    - (anything else?)
+  - activity log section (as is)
+
+------------------------------
+
+Looks good, but move status section and activity log section to below the edit demo section, so that they are always visible.
+
+Also, add a colored header for the Edit Demo section.
+
+------------------------------
+
+- 1. the uuid changes between open/close edit demo. make it persist until page is reloaded.
+- 2. the padding below the edit demo section is missing when open.
+```
+New WebSocket connection: f6093b7b-e106-40f4-a1d8-fdf87ad2f9de from 127.0.0.1
+Routing message: browser_connect from f6093b7b-e106-40f4-a1d8-fdf87ad2f9de
+Browser connected: userId=demo-user-oba1e2j4g, connectionId=f6093b7b-e106-40f4-a1d8-fdf87ad2f9de
+WebSocket disconnected: f6093b7b-e106-40f4-a1d8-fdf87ad2f9de, code=1000, reason=Client disconnect
+New WebSocket connection: ba9d9175-157d-43b4-98dd-318bc26fb702 from 127.0.0.1
+Routing message: browser_connect from ba9d9175-157d-43b4-98dd-318bc26fb702
+Browser connected: userId=demo-user-oba1e2j4g, connectionId=ba9d9175-157d-43b4-98dd-318bc26fb702```
+
+
+------------------------------
+
+(new Claude chat)
+
+I have a need for a relatively simple GUI app that needs to run on Windows and macOS:
+- communicate with a server over websocket
+- launch a program (IDE) with data received from server
+- watch for file changes (update of temp file), and send data back to server
+- configuration screen for user with: websocket URL, user ID, program seletion (IDE)
+- save confguration persistently
+
+I have tried Electron, it is way to heavy, slow to start, shows multiple icons in taskbar. I have tried Rust/Tauri, it is way too buggy (lost a day trying to get it to build, so that frontent can communicate with backend). I am ok with platform specific solutions if needed because I can use AI to do the coding. I am looking for a solution that is not bloated, stable, and does not take too much time from me to create. What do you recommend?
+
+------------------------------
+
+(new Cursor chat)
+
+A hard reset on the desktop app implementation based on Tauri, giving up after wasting a day. Let's try the Go + Fyne way.
+- familiarize yoursef with README.md and developer_context.md, but ignore any Rust/Tauri specific text
+- if needed, reference the now obsolete desktop.save1/ directory
+- add boilerplate files in the empty desktop/ directory
+- start with a hello world prgogram, so that I can veiry the build
+
+------------------------------
+
+Next task: implement the UI
+- Header: Web-IDE-Bridge Desktop
+- small intro blurb section
+- connection status section
+  - desktop <=> server, server <=> browser
+  - [Reconnect] button
+- configuration section, showing:
+  - User ID
+  - WebSocket URL
+  - Connection ID
+  - IDE Command
+  - [Change] button to edit the settings
+- activity log section
+
+For reference, the previous unusable Tauri GUI is attached
+
+------------------------------
+
+- make sections look like sections, e.g. section title inside that box, ideally with rounded corners
+  - activity log is good
+  - connecion status title should be inside the section box
+  - same for configuration
+- connection status section, with three boxes next to each other, e.g.:
+  - Desktop ↔ Server
+    (green dot) Connected
+  - server ↔ Browser
+    (red dot) Disconnected
+  - [Reconnect] button
+- configuraton section, table format, e.g.
+  | User ID:       | peter                 |
+  | WebSocket URL: | wss://foo.example.com |
+  | IDE Command:   | TextEdit              |
+  | Connection ID: | 2341234123-12341243-2 |
+  [Edit Configuration]
+
+------------------------------
+
+let's have a conistent look
+- add "v0.1.3" version number in small font next to "Web-IDE-Bridge Desktop" header
+- connection status section:
+  - two boxes next to each other
+    - smaller font for Desktop <=> Server
+    - no color in <=> symbol
+    - add colored dot next to Connected/Disconnected (color & text will change based on status)
+  - [Reconnect] button below (like configuration section)
+- configuration section:
+  - left align values (second column)
+- activity log section:
+  - remove redunant "activity log" text
+- possible to have a gray background for section headers? with gray gradient?
+
+------------------------------
+
+good enouth for now, but small tweak:
+- table column is still left justified
+- remove background color from version string
+- remove padding in sections so that header is flush with box lines (in case possible)
+
+next: work on backend logic:
+- configuration:
+  - initialize with platform dependent defaults on first launch
+    - user: os login name
+    - websocket: dev default, prod default
+    - IDE: TextEdit for mac, notepad.exe for Win
+    - connection ID: generate uuid
+  - save persistently
+- websocket client logic (take browser/web-ide-bridge.js)
+  - ping/pong
+  - connect at start, automatic reconnect every 10 sec if down
+- receive message to edit code snippet:
+  - save temp file
+  - launch IDE
+  - watch for file changes on temp file
+    - read temp file
+    - send to server
+
+------------------------------
+
+UI fixes:
+- make app window a bit wider
+- connection status: show border round the two embedded boxes (or add diver in between to make it obvious)
+- configuration: Make left column narrower so that WebSocket URL has just enough space
+- actifity log: Remove empty line at end, e.g. use full space
+- edit config:
+  - make dialog box as wide as app window, minus a ~20px margin
+  - Make left column narrower so that WebSocket URL has just enough space
+  - use full remaining wiidth for edit fields
+  - too large padding between IDE field and [Browse], use only 5ish px
+  - remove connection id from form
+
+------------------------------
+
+not yet fixed:
+- configuration: Make left column narrower so that WebSocket URL has just enough space
+- edit config:
+  - Make left column narrower so that WebSocket URL has just enough space
+  - too large padding between IDE field and [Browse], use only 5ish px (now it has an even larger gap)
+
+------------------------------
+
+
+
+------------------------------

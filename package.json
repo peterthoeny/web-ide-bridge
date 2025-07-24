@@ -47,6 +47,8 @@
     "url": "https://github.com/peterthoeny/web-ide-bridge/issues"
   },
   "homepage": "https://github.com/peterthoeny/web-ide-bridge#readme",
+  "dependencies": {
+  },
   "devDependencies": {
     "jest": "^29.7.0",
     "eslint": "^8.51.0",

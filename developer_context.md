@@ -145,8 +145,8 @@ const defaultConfig = {
 ### 3. Web-IDE-Bridge Desktop Application
 
 **Technology Stack:**
-- **Tauri** for cross-platform desktop application with native performance
-- **Rust** for backend file system operations and process management
+- **Go** for backend file system operations and process management
+- **Fyne** for cross-platform desktop application with native performance
 - **JavaScript/TypeScript** for frontend WebSocket connectivity
 - **Native WebView** for UI rendering with minimal resource usage
 
