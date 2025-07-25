@@ -29,7 +29,7 @@ class WebIdeBridgeServer {
     this.browserConnections = new Map(); // connectionId -> {ws, userId, sessionInfo}
     this.desktopConnections = new Map(); // connectionId -> {ws, userId}
     this.userSessions = new Map();       // userId -> {browserId, desktopId}
-    this.activeSessions = new Map();     // sessionId -> {userId, textareaId, browserConnectionId}
+    this.activeSessions = new Map();     // sessionId -> {userId, snippetId, browserConnectionId}
 
     // Rate limiting store
     this.rateLimitStore = new Map();
@@ -280,11 +280,11 @@ class WebIdeBridgeServer {
         break;
 
       case 'edit_request':
-        if (!message.userId || !message.sessionId || !message.payload) {
-          return { valid: false, error: 'edit_request requires userId, sessionId, and payload' };
+        if (!message.userId || !message.payload) {
+          return { valid: false, error: 'edit_request requires userId and payload' };
         }
-        if (!message.payload.textareaId || !message.payload.code) {
-          return { valid: false, error: 'edit_request payload requires textareaId and code' };
+        if (!message.payload.snippetId || !message.payload.code) {
+          return { valid: false, error: 'edit_request payload requires snippetId and code' };
         }
         if (message.payload.code.length > 10 * 1024 * 1024) { // 10MB limit
           return { valid: false, error: 'Code payload too large (max 10MB)' };
@@ -292,8 +292,8 @@ class WebIdeBridgeServer {
         break;
 
       case 'code_update':
-        if (!message.sessionId || !message.payload) {
-          return { valid: false, error: 'code_update requires sessionId and payload' };
+        if (!message.payload) {
+          return { valid: false, error: 'code_update requires payload' };
         }
         if (!message.payload.code) {
           return { valid: false, error: 'code_update payload requires code field' };
@@ -451,9 +451,6 @@ class WebIdeBridgeServer {
   }
 
   /**
-   * Handle new WebSocket connections
-   */
-  /**
    * Handle connection initialization from client
    */
   handleConnectionInit(ws, message) {
@@ -539,6 +536,9 @@ class WebIdeBridgeServer {
           case 'connection_init':
             this.handleConnectionInit(ws, message);
             break;
+          case 'info':
+            this.handleInfoMessage(ws, message);
+            break;
           default:
             this.sendError(ws, `Unknown message type: ${message.type}`);
         }
@@ -601,6 +601,9 @@ class WebIdeBridgeServer {
       role: 'browser'
     });
 
+    this.sendDesktopStatusToBrowser(userId);
+    this.sendBrowserStatusToDesktop(userId);
+
     if (this.config.debug) {
       console.log(`Browser connected: userId=${userId}, connectionId=${ws.connectionId}`);
     }
@@ -641,6 +644,9 @@ class WebIdeBridgeServer {
       role: 'desktop'
     });
 
+    this.sendBrowserStatusToDesktop(userId);
+    this.sendDesktopStatusToBrowser(userId);
+
     if (this.config.debug) {
       console.log(`Desktop connected: userId=${userId}, connectionId=${ws.connectionId}`);
     }
@@ -650,10 +656,10 @@ class WebIdeBridgeServer {
    * Handle edit request from browser
    */
   handleEditRequest(ws, message) {
-    const { userId, sessionId, payload } = message;
+    const { userId, payload } = message;
 
-    if (!userId || !sessionId || !payload) {
-      this.sendError(ws, 'Edit request requires userId, sessionId, and payload');
+    if (!userId || !payload) {
+      this.sendError(ws, 'Edit request requires userId and payload');
       return;
     }
 
@@ -670,27 +676,26 @@ class WebIdeBridgeServer {
       return;
     }
 
-    // Store active session
-    this.activeSessions.set(sessionId, {
+    // In handleEditRequest, always update the session mapping for userId:snippetId
+    const sessionKey = userId + ':' + payload.snippetId;
+    this.activeSessions.set(sessionKey, {
       userId,
-      textareaId: payload.textareaId,
-      browserConnectionId: ws.connectionId,
-      desktopConnectionId: userSession.desktopId,
+      snippetId: payload.snippetId,
+      browserConnectionId: ws.connectionId, // always update to latest browser connection
+      desktopConnectionId: userSession.desktopId, // always update to latest desktop connection
       createdAt: Date.now(),
       lastActivity: Date.now()
     });
-
     this.metrics.totalSessions++;
 
     // Forward to desktop
     this.sendMessage(desktopConn.ws, {
       type: 'edit_request',
-      sessionId,
       payload
     });
 
     if (this.config.debug) {
-      console.log(`Edit request: userId=${userId}, sessionId=${sessionId}, textareaId=${payload.textareaId}`);
+      console.log(`Edit request: userId=${userId}, snippetId=${payload.snippetId}`);
     }
   }
 
@@ -698,16 +703,31 @@ class WebIdeBridgeServer {
    * Handle code update from desktop
    */
   handleCodeUpdate(ws, message) {
-    const { sessionId, payload } = message;
+    const { userId, payload } = message;
 
-    if (!sessionId || !payload) {
-      this.sendError(ws, 'Code update requires sessionId and payload');
+    if (!userId || !payload) {
+      this.sendError(ws, 'code_update requires userId and payload');
       return;
     }
 
-    // Find active session
-    const session = this.activeSessions.get(sessionId);
+    const sessionKey = userId + ':' + payload.snippetId;
+    const session = this.activeSessions.get(sessionKey);
     if (!session) {
+      // Try to notify the desktop if possible
+      // Find the desktop connection for this user (if any)
+      const userSession = this.userSessions.get(userId);
+      if (userSession && userSession.desktopId) {
+        const desktopConn = this.desktopConnections.get(userSession.desktopId);
+        if (desktopConn) {
+          this.sendMessage(desktopConn.ws, {
+            type: 'info',
+            payload: {
+              snippetId: payload.snippetId,
+              message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+            }
+          });
+        }
+      }
       this.sendError(ws, 'Session not found or expired');
       return;
     }
@@ -715,10 +735,25 @@ class WebIdeBridgeServer {
     // Update session activity
     session.lastActivity = Date.now();
 
-    // Find browser connection
-    const browserConn = this.browserConnections.get(session.browserConnectionId);
+    // Always get the latest browser connection for this userId:snippetId
+    const userSession = this.userSessions.get(userId);
+    let browserConn = null;
+    if (userSession && userSession.browserId) {
+      browserConn = this.browserConnections.get(userSession.browserId);
+    }
     if (!browserConn) {
-      this.sendError(ws, 'Browser connection no longer active');
+      // Send info message to desktop
+      const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
+      if (desktopConn) {
+        this.sendMessage(desktopConn.ws, {
+          type: 'info',
+          payload: {
+            snippetId: session.snippetId,
+            message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+          }
+        });
+      }
+      // Do not treat as error, just return
       return;
     }
 
@@ -726,13 +761,13 @@ class WebIdeBridgeServer {
     this.sendMessage(browserConn.ws, {
       type: 'code_update',
       payload: {
-        textareaId: session.textareaId,
+        snippetId: session.snippetId,
         code: payload.code
       }
     });
 
     if (this.config.debug) {
-      console.log(`Code update: sessionId=${sessionId}, textareaId=${session.textareaId}`);
+      console.log(`Code update: userId=${userId}, snippetId=${session.snippetId}`);
     }
   }
 
@@ -744,6 +779,27 @@ class WebIdeBridgeServer {
       type: 'pong',
       payload: message.payload || {},
       timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Handle info message from browser
+   */
+  handleInfoMessage(ws, message) {
+    const { userId, payload } = message;
+    if (!userId || !payload || !payload.snippetId || !payload.message) return;
+    // Find user's desktop connection
+    const userSession = this.userSessions.get(userId);
+    if (!userSession || !userSession.desktopId) return;
+    const desktopConn = this.desktopConnections.get(userSession.desktopId);
+    if (!desktopConn) return;
+    // Forward info message to desktop
+    this.sendMessage(desktopConn.ws, {
+      type: 'info',
+      payload: {
+        snippetId: payload.snippetId,
+        message: payload.message
+      }
     });
   }
 
@@ -768,6 +824,7 @@ class WebIdeBridgeServer {
           this.userSessions.delete(browserConn.userId);
         }
       }
+      this.sendBrowserStatusToDesktop(browserConn.userId);
     }
 
     // Remove from desktop connections
@@ -783,15 +840,18 @@ class WebIdeBridgeServer {
           this.userSessions.delete(desktopConn.userId);
         }
       }
+      this.sendDesktopStatusToBrowser(desktopConn.userId);
     }
 
     // Clean up active sessions associated with this connection
-    for (const [sessionId, session] of this.activeSessions.entries()) {
-      if (session.browserConnectionId === ws.connectionId || 
-          session.desktopConnectionId === ws.connectionId) {
-        this.activeSessions.delete(sessionId);
-      }
-    }
+    // In handleDisconnection, remove the code that deletes activeSessions for the disconnected connection.
+    // (Comment out or delete this block:)
+    // for (const [sessionId, session] of this.activeSessions.entries()) {
+    //   if (session.browserConnectionId === ws.connectionId || 
+    //       session.desktopConnectionId === ws.connectionId) {
+    //     this.activeSessions.delete(sessionId);
+    //   }
+    // }
 
     // Update metrics
     this.metrics.activeConnections.browser = this.browserConnections.size;
@@ -1231,7 +1291,7 @@ class WebIdeBridgeServer {
           activeSessions: Array.from(this.activeSessions.entries()).map(([id, session]) => ({
             sessionId: id,
             userId: session.userId,
-            textareaId: session.textareaId,
+            snippetId: session.snippetId,
             browserConnectionId: session.browserConnectionId,
             desktopConnectionId: session.desktopConnectionId,
             createdAt: new Date(session.createdAt).toISOString(),
@@ -1511,6 +1571,29 @@ class WebIdeBridgeServer {
       console.error('Error during shutdown:', error);
       throw error;
     }
+  }
+
+  sendDesktopStatusToBrowser(userId) {
+    const userSession = this.userSessions.get(userId);
+    if (!userSession || !userSession.browserId) return;
+    const browserConn = this.browserConnections.get(userSession.browserId);
+    if (!browserConn) return;
+    const desktopConnected = !!(userSession && userSession.desktopId && this.desktopConnections.has(userSession.desktopId));
+    this.sendMessage(browserConn.ws, {
+      type: 'status_update',
+      desktopConnected
+    });
+  }
+  sendBrowserStatusToDesktop(userId) {
+    const userSession = this.userSessions.get(userId);
+    if (!userSession || !userSession.desktopId) return;
+    const desktopConn = this.desktopConnections.get(userSession.desktopId);
+    if (!desktopConn) return;
+    const browserConnected = !!(userSession && userSession.browserId && this.browserConnections.has(userSession.browserId));
+    this.sendMessage(desktopConn.ws, {
+      type: 'status_update',
+      browserConnected
+    });
   }
 }
 
