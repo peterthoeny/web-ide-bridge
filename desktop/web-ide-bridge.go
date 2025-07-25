@@ -45,16 +45,65 @@ type Config struct {
 	ConnectionID string `json:"connection_id"`
 }
 
-// Returns platform-dependent default config
+// Update defaultConfig to use app config
 func defaultConfig() Config {
 	usr, _ := user.Current()
 	userID := usr.Username
+	appCfg, _ := loadAppConfig()
 	wsURL := "ws://localhost:8071/web-ide-bridge/ws"
+	if appCfg.DefaultWSURL["dev"] != "" {
+		wsURL = appCfg.DefaultWSURL["dev"]
+	}
 	ide := "TextEdit"
-	if runtime.GOOS == "windows" {
-		ide = "notepad.exe"
+	if runtime.GOOS == "darwin" {
+		// Use app config IDE list if present
+		if len(appCfg.DefaultIDEs["darwin"]) > 0 {
+			found := false
+			checked := []string{}
+			for _, candidate := range appCfg.DefaultIDEs["darwin"] {
+				appPath := filepath.Join("/Applications", candidate+".app")
+				checked = append(checked, appPath)
+				if _, err := os.Stat(appPath); err == nil {
+					ide = candidate
+					found = true
+					break
+				}
+			}
+			if !found {
+				ide = "TextEdit"
+			}
+			// Debug log
+			fmt.Printf("[IDE Detection] Checked: %v, Selected: %s\n", checked, ide)
+		} else {
+			// fallback to built-in detection
+			editors := []struct {
+				name string
+				app  string
+			}{
+				{"Visual Studio Code", "/Applications/Visual Studio Code.app"},
+				{"Cursor", "/Applications/Cursor.app"},
+				{"Xcode", "/Applications/Xcode.app"},
+				{"TextEdit", "/Applications/TextEdit.app"},
+			}
+			for _, editor := range editors {
+				if _, err := os.Stat(editor.app); err == nil {
+					ide = editor.name
+					break
+				}
+			}
+		}
+	} else if runtime.GOOS == "windows" {
+		if len(appCfg.DefaultIDEs["windows"]) > 0 {
+			ide = appCfg.DefaultIDEs["windows"][0]
+		} else {
+			ide = "notepad.exe"
+		}
 	} else if runtime.GOOS == "linux" {
-		ide = "gedit"
+		if len(appCfg.DefaultIDEs["linux"]) > 0 {
+			ide = appCfg.DefaultIDEs["linux"][0]
+		} else {
+			ide = "gedit"
+		}
 	}
 	return Config{
 		UserID:       userID,
@@ -113,6 +162,35 @@ func generateUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", r[0:4], r[4:6], r[6:8], r[8:10], r[10:16])
 }
 
+// AppConfig struct for app/org defaults
+type AppConfig struct {
+	DefaultIDEs          map[string][]string `json:"default_ides"`
+	DefaultWSURL         map[string]string   `json:"default_ws_url"`
+	TempFileCleanupHours int                 `json:"temp_file_cleanup_hours"`
+}
+
+// Load app config from desktop/web-ide-bridge.conf, /etc/web-ide-bridge.conf, or $WEB_IDE_BRIDGE_CONFIG
+func loadAppConfig() (AppConfig, error) {
+	var config AppConfig
+	paths := []string{}
+	if env := os.Getenv("WEB_IDE_BRIDGE_CONFIG"); env != "" {
+		paths = append(paths, env)
+	}
+	paths = append(paths, "desktop/web-ide-bridge.conf", "/etc/web-ide-bridge.conf")
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			if err := json.Unmarshal(data, &config); err == nil {
+				return config, nil
+			}
+		}
+	}
+	return config, nil // empty config if not found
+}
+
 // ----------------------
 // WebSocket Client
 // ----------------------
@@ -126,22 +204,24 @@ type WebSocketClient struct {
 	stopCh      chan struct{}
 	reconnectCh chan struct{}
 	statusCh    chan string              // notify UI of status changes
-	watchers    map[string]chan struct{} // textareaId -> stop channel
+	watchers    map[string]chan struct{} // snippetId -> stop channel
 	watchersMu  sync.Mutex
-	// sessionMap maps textareaId to sessionId
-	sessionMap map[string]string
+	// sessionMap maps snippetId to sessionId
+	sessionMap       map[string]string
+	browserConnected bool
 }
 
 func NewWebSocketClient(cfg Config, logFunc func(string)) *WebSocketClient {
 	return &WebSocketClient{
-		cfg:         cfg,
-		status:      "disconnected",
-		logFunc:     logFunc,
-		stopCh:      make(chan struct{}),
-		reconnectCh: make(chan struct{}, 1),
-		statusCh:    make(chan string, 1),
-		watchers:    make(map[string]chan struct{}),
-		sessionMap:  make(map[string]string),
+		cfg:              cfg,
+		status:           "disconnected",
+		logFunc:          logFunc,
+		stopCh:           make(chan struct{}),
+		reconnectCh:      make(chan struct{}, 1),
+		statusCh:         make(chan string, 1),
+		watchers:         make(map[string]chan struct{}),
+		sessionMap:       make(map[string]string),
+		browserConnected: false,
 	}
 }
 
@@ -231,22 +311,47 @@ func (c *WebSocketClient) readLoop(pongCh chan struct{}) {
 		if typeVal == "edit_request" {
 			c.log("Received edit_request")
 			payload, _ := m["payload"].(map[string]interface{})
-			sessionId, _ := m["sessionId"].(string)
-			textareaId, _ := payload["textareaId"].(string)
+			snippetId, _ := payload["snippetId"].(string)
 			code, _ := payload["code"].(string)
 			fileType, _ := payload["fileType"].(string)
-			if sessionId != "" && textareaId != "" {
-				c.sessionMap[textareaId] = sessionId
+			if snippetId != "" {
+				c.sessionMap[snippetId] = snippetId // Assuming snippetId is the sessionId for now
 			}
-			go c.handleEditRequest(textareaId, code, fileType)
+			go c.handleEditRequest(snippetId, code, fileType)
+		} else if typeVal == "status_update" {
+			if val, ok := m["browserConnected"].(bool); ok {
+				c.browserConnected = val
+				// Optionally, notify UI via a channel or callback
+			}
+		} else if typeVal == "info" {
+			payload, _ := m["payload"].(map[string]interface{})
+			snippetId, _ := payload["snippetId"].(string)
+			message, _ := payload["message"].(string)
+			if message != "" {
+				c.log("[info] snippetId=" + snippetId + ": " + message)
+			}
 		}
 	}
 }
 
 // Handle edit_request: save code, launch IDE, start watcher
-func (c *WebSocketClient) handleEditRequest(textareaId, code, fileType string) {
+func (c *WebSocketClient) handleEditRequest(snippetId, code, fileType string) {
 	tmpDir := os.TempDir()
-	tmpFile := filepath.Join(tmpDir, "web-ide-bridge-"+textareaId+"."+fileType)
+	// Add a helper to sanitize snippetId for file names
+	sanitizeSnippetId := func(snippetId string) string {
+		var b strings.Builder
+		for _, r := range snippetId {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+				b.WriteRune(r)
+			} else {
+				b.WriteRune('_')
+			}
+		}
+		return b.String()
+	}
+	sanitizedId := sanitizeSnippetId(snippetId)
+	tmpFile := filepath.Join(tmpDir, "web-"+sanitizedId+"."+fileType)
+	c.log("[handleEditRequest] userId=" + c.cfg.UserID + ", snippetId=" + snippetId + ", fileType=" + fileType)
 	c.log("Saving code to temp file: " + tmpFile)
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
 		c.log("Failed to write temp file: " + err.Error())
@@ -258,8 +363,9 @@ func (c *WebSocketClient) handleEditRequest(textareaId, code, fileType string) {
 	ideCmd := c.cfg.IDECommand
 	if runtime.GOOS == "darwin" {
 		if strings.HasSuffix(ideCmd, ".app") {
-			// Full path to .app bundle
-			cmd = exec.Command("open", "-a", ideCmd, tmpFile)
+			// Extract app name from path, e.g., /Applications/TextEdit.app -> TextEdit
+			appName := strings.TrimSuffix(filepath.Base(ideCmd), ".app")
+			cmd = exec.Command("open", "-a", appName, tmpFile)
 		} else if !strings.Contains(ideCmd, "/") {
 			// App name only (e.g., TextEdit, Cursor)
 			cmd = exec.Command("open", "-a", ideCmd, tmpFile)
@@ -277,25 +383,25 @@ func (c *WebSocketClient) handleEditRequest(textareaId, code, fileType string) {
 		c.log("Failed to launch IDE: " + err.Error())
 		return
 	}
-	c.startFileWatcher(textareaId, tmpFile, fileType)
+	c.startFileWatcher(snippetId, tmpFile, fileType)
 }
 
-// Start or restart a file watcher for a textareaId
-func (c *WebSocketClient) startFileWatcher(textareaId, tmpFile, fileType string) {
+// Start or restart a file watcher for a snippetId
+func (c *WebSocketClient) startFileWatcher(snippetId, tmpFile, fileType string) {
 	c.watchersMu.Lock()
-	if stopCh, ok := c.watchers[textareaId]; ok {
-		c.log("Stopping previous watcher for " + textareaId)
+	if stopCh, ok := c.watchers[snippetId]; ok {
+		c.log("Stopping previous watcher for " + snippetId)
 		close(stopCh)
-		delete(c.watchers, textareaId)
+		delete(c.watchers, snippetId)
 	}
 	stopCh := make(chan struct{})
-	c.watchers[textareaId] = stopCh
+	c.watchers[snippetId] = stopCh
 	c.watchersMu.Unlock()
-	go c.watchFileAndSendUpdates(tmpFile, textareaId, fileType, stopCh)
+	go c.watchFileAndSendUpdates(tmpFile, snippetId, fileType, stopCh)
 }
 
 // Watch file for changes and send updates if connected
-func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, textareaId, fileType string, stopCh chan struct{}) {
+func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType string, stopCh chan struct{}) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		c.log("Failed to create file watcher: " + err.Error())
@@ -324,7 +430,7 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, textareaId, fileType 
 					lastContent = string(content)
 					if c.getStatus() == "connected" {
 						c.log("File changed, sending update to server")
-						c.sendCodeUpdate(textareaId, string(content), fileType)
+						c.sendCodeUpdate(snippetId, string(content), fileType)
 					} else {
 						c.log("File changed, but not connected. Please save again after reconnect.")
 					}
@@ -336,7 +442,7 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, textareaId, fileType 
 			}
 			c.log("Watcher error: " + err.Error())
 		case <-stopCh:
-			c.log("File watcher stopped for " + textareaId)
+			c.log("File watcher stopped for " + snippetId)
 			return
 		}
 	}
@@ -354,22 +460,23 @@ func (c *WebSocketClient) stopAllWatchers() {
 }
 
 // Send code update to server
-func (c *WebSocketClient) sendCodeUpdate(textareaId, code, fileType string) {
-	sessionId := c.sessionMap[textareaId]
+func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
+	sessionId := c.sessionMap[snippetId]
 	if sessionId == "" {
-		c.log("No sessionId found for textareaId: " + textareaId + ", not sending code_update")
+		c.log("No sessionId found for snippetId: " + snippetId + ", not sending code_update")
 		return
 	}
+	c.log("[sendCodeUpdate] userId=" + c.cfg.UserID + ", snippetId=" + snippetId + ", fileType=" + fileType)
 	msg := map[string]interface{}{
 		"type":         "code_update",
 		"connectionId": c.cfg.ConnectionID,
 		"userId":       c.cfg.UserID,
 		"sessionId":    sessionId,
 		"payload": map[string]interface{}{
-			"textareaId": textareaId,
-			"code":       code,
-			"fileType":   fileType,
-			"timestamp":  time.Now().UnixMilli(),
+			"snippetId": snippetId,
+			"code":      code,
+			"fileType":  fileType,
+			"timestamp": time.Now().UnixMilli(),
 		},
 	}
 	data, _ := json.Marshal(msg)
@@ -489,6 +596,27 @@ func main() {
 
 	wsClient := NewWebSocketClient(cfg, appendLog)
 	wsClient.Start()
+
+	// Start temp file cleanup goroutine
+	cleanupHours := 24
+	if appCfg, err := loadAppConfig(); err == nil && appCfg.TempFileCleanupHours > 0 {
+		cleanupHours = appCfg.TempFileCleanupHours
+	}
+	go func() {
+		for {
+			tmpDir := os.TempDir()
+			files, err := ioutil.ReadDir(tmpDir)
+			if err == nil {
+				now := time.Now()
+				for _, f := range files {
+					if strings.HasPrefix(f.Name(), "web-") && f.ModTime().Add(time.Duration(cleanupHours)*time.Hour).Before(now) {
+						os.Remove(filepath.Join(tmpDir, f.Name()))
+					}
+				}
+			}
+			time.Sleep(1 * time.Hour)
+		}
+	}()
 
 	// Config value labels (for live update)
 	userVal := widget.NewLabel(cfg.UserID)
@@ -742,6 +870,25 @@ func main() {
 			}
 			dsStatusDot.Refresh()
 			dsStatusBg.Refresh()
+		}
+	}()
+
+	// Add a goroutine to update sbStatusLabel and sbStatusDot based on wsClient.browserConnected
+	go func() {
+		for {
+			// poll or use a channel for updates
+			time.Sleep(1 * time.Second)
+			if wsClient.browserConnected {
+				sbStatusLabel.SetText("Connected")
+				sbStatusDot.FillColor = color.RGBA{0, 200, 0, 255}
+				sbStatusBg.FillColor = color.RGBA{230, 255, 230, 255}
+			} else {
+				sbStatusLabel.SetText("Disconnected")
+				sbStatusDot.FillColor = color.RGBA{200, 0, 0, 255}
+				sbStatusBg.FillColor = color.RGBA{255, 235, 235, 255}
+			}
+			sbStatusDot.Refresh()
+			sbStatusBg.Refresh()
 		}
 	}()
 
