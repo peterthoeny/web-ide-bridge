@@ -40,6 +40,7 @@ web-ide-bridge/
 │   ├── jquery-demo.html                # jQuery-based custom UI demo
 │   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (dev)
 │   ├── web-ide-bridge.min.js           # Minified production version
+│   ├── web-ide-bridge.min.js.map       # Source map for minified version
 │   ├── package.json                    # Browser package configuration
 │   ├── webpack.config.js               # Build configuration
 │   └── src/
