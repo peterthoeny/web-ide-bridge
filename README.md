@@ -192,24 +192,26 @@ DEBUG_TESTS=true npm test
 
 The desktop app is implemented in Go using the Fyne UI toolkit for native performance and minimal resource usage.
 
-#### Option A: Download Pre-built Binaries
-Download and install the Web-IDE-Bridge desktop application for your platform:
-- **Windows**: `Web-IDE-Bridge-Setup.exe`
-- **macOS**: `Web-IDE-Bridge.dmg`
-- **Linux**: `Web-IDE-Bridge.AppImage`
+#### macOS/Windows/Linux Build
 
-#### Option B: Build from Source
-
-**macOS/Windows/Linux Build:**
 ```bash
 cd desktop
 # Run the desktop app in development mode
-go run main.go
+go run web-ide-bridge.go
 # Or build a binary for your platform
-go build -o web-ide-bridge main.go
+# First modify web-ide-bridge.conf to match your organization, then
+go build -o web-ide-bridge web-ide-bridge.go
 ```
 
 Configure your preferred IDE and WebSocket server URL on first launch.
+
+#### macOS Specific Build
+
+FIXME 
+
+#### Windows Specific Build
+
+FIXME
 
 ### 5. Integrate into Web Application
 
@@ -439,34 +441,48 @@ location /web-ide-bridge/ws {
 
 ### 🖥️ Desktop App Configuration
 
-The desktop app supports an app/org config file at `desktop/web-ide-bridge.conf` (JSON format). This file can specify:
-- Default IDEs per OS (for auto-detection on first run)
-- Default WebSocket URLs for dev and prod
-- Any other org-specific defaults
+The desktop app supports an app/org config file in several locations. The app will use the first config file it finds in this order:
 
-Example:
+1. `/etc/web-ide-bridge.conf` (system-wide, for all users)
+2. `web-ide-bridge.conf` (in the current working directory)
+3. `desktop/web-ide-bridge.conf` (in the project subdirectory)
+
+The config file should be in JSON format, for example:
+
 ```json
 {
-  "default_ides": {
-    "darwin": ["Visual Studio Code", "Cursor", "Xcode", "TextEdit"],
-    "windows": ["notepad.exe"],
-    "linux": ["gedit"]
+  "defaults": {
+    "ides": {
+      "darwin": ["Cursor", "Visual Studio Code", "Xcode", "TextEdit"],
+      "windows": ["notepad.exe"],
+      "linux": ["gedit"]
+    },
+    "ws_url": "ws://localhost:8071/web-ide-bridge/ws"
   },
-  "default_ws_url": {
-    "dev": "ws://localhost:8071/web-ide-bridge/ws",
-    "prod": "wss://webapp.example.com/web-ide-bridge/ws"
-  }
+  "temp_file_cleanup_hours": 24
 }
 ```
 
-The desktop app loads config in this order (first found wins):
-1. `$WEB_IDE_BRIDGE_CONFIG` (env var)
-2. `desktop/web-ide-bridge.conf` (project default)
-3. `/etc/web-ide-bridge.conf` (system/org-wide)
-4. `~/.web-ide-bridge/config.json` (user-specific, for runtime/user settings)
-5. Built-in defaults
+**How it works:**
+- When a user starts the app for the first time (no `~/.web-ide-bridge/config.json` exists), the app reads the first config file it finds (in the order above) and uses those values to create the user config.
+- After that, the app always loads from the user config, so changes to the org config do not affect existing users unless they delete their user config.
+- For production/distribution, update the org config with your organization's settings before distributing the app. New users will get the correct defaults.
 
-On macOS, the app will auto-detect the first available IDE from the list for the current OS. You can customize this list for your org or deployment.
+**To reset and pick up new org config values:**
+1. Edit your org config (in one of the locations above).
+2. Delete your user config:
+   ```bash
+   rm ~/.web-ide-bridge/config.json
+   ```
+3. Restart the desktop app. The new user config will be created with the updated org config values.
+
+**Troubleshooting:**
+- If the app does not pick up your config changes, make sure your config file is valid JSON and in one of the supported locations.
+- The app prints debug output on startup showing which config values were loaded.
+
+**Note:**
+- If your IDE command or file path contains spaces or special characters, enclose it in quotes or provide the full path. For example, use "C:\\Program Files\\Sublime Text 3\\sublime_text.exe" or "/Applications/Visual Studio Code.app".
+- On Windows, the IDE command must be in your PATH, or provide the full path to the .exe file.
 
 ## 📊 Monitoring and Observability
 

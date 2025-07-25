@@ -1,6 +1,6 @@
-# Web-IDE-Bridge Server
+# Web-IDE-Bridge Browser
 
-Node.js WebSocket relay server that bridges web applications with desktop IDEs.
+JavaScript library to integrate web applications with desktop IDEs.
 
 See [../README.md](../README.md) for details.
 

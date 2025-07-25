@@ -7,6 +7,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -50,13 +51,13 @@ func defaultConfig() Config {
 	usr, _ := user.Current()
 	userID := usr.Username
 	appCfg, _ := loadAppConfig()
-	wsURL := "ws://localhost:8071/web-ide-bridge/ws"
-	if appCfg.DefaultWSURL["dev"] != "" {
-		wsURL = appCfg.DefaultWSURL["dev"]
+	fmt.Printf("[DEBUG] Loaded org config: ws_url=%q, ides=%v\n", appCfg.WSURL, appCfg.DefaultIDEs)
+	wsURL := "ws://localhost:8071/web-ide-bridge/ws" // fallback default
+	if appCfg.WSURL != "" {
+		wsURL = appCfg.WSURL
 	}
 	ide := "TextEdit"
 	if runtime.GOOS == "darwin" {
-		// Use app config IDE list if present
 		if len(appCfg.DefaultIDEs["darwin"]) > 0 {
 			found := false
 			checked := []string{}
@@ -72,10 +73,8 @@ func defaultConfig() Config {
 			if !found {
 				ide = "TextEdit"
 			}
-			// Debug log
 			fmt.Printf("[IDE Detection] Checked: %v, Selected: %s\n", checked, ide)
 		} else {
-			// fallback to built-in detection
 			editors := []struct {
 				name string
 				app  string
@@ -154,19 +153,27 @@ func saveConfig(cfg Config) error {
 // UUID v4 generator (simple, not cryptographically secure)
 func generateUUID() string {
 	r := make([]byte, 16)
-	f, _ := os.Open("/dev/urandom")
-	defer f.Close()
-	f.Read(r)
+	_, err := rand.Read(r)
+	if err != nil {
+		// fallback: all zeroes, but should never happen
+		return "00000000-0000-4000-8000-000000000000"
+	}
 	r[6] = (r[6] & 0x0f) | 0x40 // version 4
 	r[8] = (r[8] & 0x3f) | 0x80 // variant
 	return fmt.Sprintf("%x-%x-%x-%x-%x", r[0:4], r[4:6], r[6:8], r[8:10], r[10:16])
 }
 
 // AppConfig struct for app/org defaults
+// { "defaults": { "ides": { ... }, "ws_url": "..." }, "temp_file_cleanup_hours": ... }
 type AppConfig struct {
-	DefaultIDEs          map[string][]string `json:"default_ides"`
-	DefaultWSURL         map[string]string   `json:"default_ws_url"`
+	DefaultIDEs          map[string][]string `json:"ides"`
+	WSURL                string              `json:"ws_url"`
 	TempFileCleanupHours int                 `json:"temp_file_cleanup_hours"`
+}
+
+type FullAppConfig struct {
+	Defaults             AppConfig `json:"defaults"`
+	TempFileCleanupHours int       `json:"temp_file_cleanup_hours"`
 }
 
 // Load app config from desktop/web-ide-bridge.conf, /etc/web-ide-bridge.conf, or $WEB_IDE_BRIDGE_CONFIG
@@ -176,16 +183,21 @@ func loadAppConfig() (AppConfig, error) {
 	if env := os.Getenv("WEB_IDE_BRIDGE_CONFIG"); env != "" {
 		paths = append(paths, env)
 	}
-	paths = append(paths, "desktop/web-ide-bridge.conf", "/etc/web-ide-bridge.conf")
+	// Look in /etc/, then current dir, then desktop/
+	paths = append(paths, "/etc/web-ide-bridge.conf", "web-ide-bridge.conf", "desktop/web-ide-bridge.conf")
 	for _, path := range paths {
 		if _, err := os.Stat(path); err == nil {
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
 			}
-			if err := json.Unmarshal(data, &config); err == nil {
-				return config, nil
+			var fullConfig FullAppConfig
+			if err := json.Unmarshal(data, &fullConfig); err != nil {
+				continue
 			}
+			config = fullConfig.Defaults
+			config.TempFileCleanupHours = fullConfig.TempFileCleanupHours
+			return config, nil
 		}
 	}
 	return config, nil // empty config if not found
@@ -742,21 +754,25 @@ func main() {
 		// IDE field row with Browse button inline
 		ideRow := container.NewBorder(nil, nil, nil, browseBtn, ideEntry)
 
-		// macOS-only tip for .app bundles
-		var macTip fyne.CanvasObject
+		// In showEditConfig, show only the platform-specific tip for the current OS
+		var platformTip fyne.CanvasObject
 		if runtime.GOOS == "darwin" {
-			macTipLabel := widget.NewLabel("For macOS: Enter the app name (e.g. Cursor, TextEdit) or the full path to the .app bundle (e.g. /Applications/Cursor.app)")
+			macTipLabel := widget.NewLabel("Enter the app name (e.g. Cursor, TextEdit) or the full path to the .app bundle (e.g. /Applications/Cursor.app)")
 			macTipLabel.Wrapping = fyne.TextWrapWord
-			macTip = macTipLabel
+			platformTip = macTipLabel
+		} else if runtime.GOOS == "windows" {
+			winTipLabel := widget.NewLabel("The IDE command must be in your PATH, or provide the full path to the .exe file.")
+			winTipLabel.Wrapping = fyne.TextWrapWord
+			platformTip = winTipLabel
 		} else {
-			macTip = layout.NewSpacer()
+			platformTip = layout.NewSpacer()
 		}
 
 		form := container.New(layout.NewFormLayout(),
 			widget.NewLabelWithStyle("User ID:", fyne.TextAlignTrailing, fyne.TextStyle{}), userEntry,
 			widget.NewLabelWithStyle("WebSocket URL:", fyne.TextAlignTrailing, fyne.TextStyle{}), wsEntry,
 			widget.NewLabelWithStyle("IDE Command:", fyne.TextAlignTrailing, fyne.TextStyle{}), ideRow,
-			widget.NewLabel(""), macTip,
+			widget.NewLabel(""), platformTip,
 		)
 
 		customDialogContent := container.NewVBox(
