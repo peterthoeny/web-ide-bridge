@@ -8,6 +8,7 @@ package main
 
 import (
 	"crypto/rand"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -34,6 +35,10 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 )
+
+//go:embed web-ide-bridge.conf
+var _ embed.FS // keep linter from removing
+var embeddedConfig []byte
 
 // ----------------------
 // Persistent Config
@@ -195,6 +200,15 @@ func loadAppConfig() (AppConfig, error) {
 			if err := json.Unmarshal(data, &fullConfig); err != nil {
 				continue
 			}
+			config = fullConfig.Defaults
+			config.TempFileCleanupHours = fullConfig.TempFileCleanupHours
+			return config, nil
+		}
+	}
+	// Fallback: use embedded config if present
+	if len(embeddedConfig) > 0 {
+		var fullConfig FullAppConfig
+		if err := json.Unmarshal(embeddedConfig, &fullConfig); err == nil {
 			config = fullConfig.Defaults
 			config.TempFileCleanupHours = fullConfig.TempFileCleanupHours
 			return config, nil

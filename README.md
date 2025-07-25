@@ -446,6 +446,7 @@ The desktop app supports an app/org config file in several locations. The app wi
 1. `/etc/web-ide-bridge.conf` (system-wide, for all users)
 2. `web-ide-bridge.conf` (in the current working directory)
 3. `desktop/web-ide-bridge.conf` (in the project subdirectory)
+4. **If no config file is found, the app will use the config embedded at build time from `web-ide-bridge.conf` in the source directory.**
 
 The config file should be in JSON format, for example:
 
@@ -465,11 +466,12 @@ The config file should be in JSON format, for example:
 
 **How it works:**
 - When a user starts the app for the first time (no `~/.web-ide-bridge/config.json` exists), the app reads the first config file it finds (in the order above) and uses those values to create the user config.
+- If no config file is found, the app will use the config embedded at build time from `web-ide-bridge.conf` in the source directory.
 - After that, the app always loads from the user config, so changes to the org config do not affect existing users unless they delete their user config.
-- For production/distribution, update the org config with your organization's settings before distributing the app. New users will get the correct defaults.
+- For production/distribution, **place your production `web-ide-bridge.conf` in the source directory before building**. The config will be embedded in the executable, so you can distribute just the binary if you wish. If a config file is present in any of the search paths, it will override the embedded config.
 
 **To reset and pick up new org config values:**
-1. Edit your org config (in one of the locations above).
+1. Edit your org config (in one of the locations above, or update the embedded config and rebuild).
 2. Delete your user config:
    ```bash
    rm ~/.web-ide-bridge/config.json
@@ -477,8 +479,8 @@ The config file should be in JSON format, for example:
 3. Restart the desktop app. The new user config will be created with the updated org config values.
 
 **Troubleshooting:**
-- If the app does not pick up your config changes, make sure your config file is valid JSON and in one of the supported locations.
-- The app prints debug output on startup showing which config values were loaded.
+- If the app does not pick up your config changes, make sure your config file is valid JSON and in one of the supported locations, or that you have embedded the correct config at build time.
+- The app prints debug output on startup showing which config values were loaded and whether the embedded config was used.
 
 **Note:**
 - If your IDE command or file path contains spaces or special characters, enclose it in quotes or provide the full path. For example, use "C:\\Program Files\\Sublime Text 3\\sublime_text.exe" or "/Applications/Visual Studio Code.app".
