@@ -71,7 +71,7 @@ All messages use JSON format with the following structure:
   "type": "message_type",
   "connectionId": "uuid-v4-string", 
   "userId": "user-identifier",
-  "sessionId": "edit-session-id",
+  "snippetId": "edit-snippet-id",
   "payload": {
     // Message-specific data
   }
@@ -147,6 +147,13 @@ const defaultConfig = {
 **Technology Stack:**
 - **Go** for backend file system operations, process management, and cross-platform desktop UI (using Fyne)
 - **JavaScript/TypeScript** for frontend WebSocket connectivity (browser)
+
+### Desktop App Org/App Config
+
+- The desktop app supports an org/app config file at `desktop/web-ide-bridge.conf` (JSON).
+- This file can specify default IDEs per OS, default WebSocket URLs, and other org-specific defaults.
+- Config loading order: env var, desktop config, /etc config, user config, built-in defaults.
+- On macOS, the app will auto-detect the first available IDE from the list.
 
 ## Development Workflow
 

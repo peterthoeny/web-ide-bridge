@@ -170,9 +170,9 @@ describe('Comprehensive Server Validation', () => {
       client.send({
         type: 'edit_request',
         userId: 'test-user',
-        sessionId: 'test-session',
+        snippetId: 'test-snippet',
         payload: {
-          textareaId: 'test',
+          snippetId: 'test',
           code: oversizedCode
         }
       });
@@ -199,8 +199,7 @@ describe('Comprehensive Server Validation', () => {
       const updatedCode = 'console.log("hello world");';
 
       const workflow = await simulateEditWorkflow(browserClient, desktopClient, {
-        sessionId: global.testUtils.generateId('simple-edit'),
-        textareaId: 'simple-editor',
+        snippetId: global.testUtils.generateId('simple-edit'),
         originalCode,
         updatedCode,
         fileType: 'js',
@@ -225,8 +224,7 @@ describe('Comprehensive Server Validation', () => {
           user.browserClient,
           user.desktopClient,
           {
-            sessionId: global.testUtils.generateId(`user${index}-edit`),
-            textareaId: `editor-${index}`,
+            snippetId: global.testUtils.generateId(`user${index}-edit`),
             originalCode: `console.log("user ${index} original");`,
             updatedCode: `console.log("user ${index} updated");`,
             fileType: 'js',
@@ -321,7 +319,7 @@ describe('Comprehensive Server Validation', () => {
     test('should handle session cleanup with corrupted data', async () => {
       // Add various types of corrupted session data
       const corruptedSessions = [
-        { userId: 'user1', textareaId: 'textarea1' }, // Missing lastActivity
+        { userId: 'user1', snippetId: 'snippet1' }, // Missing lastActivity
         { userId: 'user2', lastActivity: Date.now() - 10000 }, // Valid but old
         null, // Null session
       ];
@@ -374,8 +372,7 @@ describe('Comprehensive Server Validation', () => {
         
         // Perform a simple edit operation
         await simulateEditWorkflow(browserClient, desktopClient, {
-          sessionId: global.testUtils.generateId(`memory-${i}`),
-          textareaId: `memory-textarea-${i}`,
+          snippetId: global.testUtils.generateId(`memory-${i}`),
           originalCode: 'console.log("memory test");',
           updatedCode: 'console.log("memory test updated");',
           userId: `memory-test-${i}`,

@@ -395,7 +395,7 @@ describe('Server Edge Cases and Error Handling', () => {
         connectionId: client.connectionId,
         userId: 'test-user',
         payload: {
-          textareaId: 'test',
+          snippetId: 'test',
           code: 'console.log("test");'
         }
         // Missing sessionId
@@ -412,10 +412,10 @@ describe('Server Edge Cases and Error Handling', () => {
       const client = createTestClient(serverPort);
       await client.connect();
 
-      // Missing textareaId in payload
+      // Missing snippetId in payload
       const message = global.testUtils.createMessage('edit_request', {
         code: 'console.log("test");'
-        // Missing textareaId
+        // Missing snippetId
       }, {
         connectionId: client.connectionId,
         userId: 'test-user',
@@ -425,7 +425,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(message);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('edit_request payload requires textareaId and code');
+      expect(error.payload.message).toContain('edit_request payload requires snippetId and code');
 
       await client.close();
     });
@@ -446,7 +446,7 @@ describe('Server Edge Cases and Error Handling', () => {
       // Create payload larger than 10MB
       const largeCode = 'x'.repeat(11 * 1024 * 1024);
       const message = global.testUtils.createMessage('edit_request', {
-        textareaId: 'test',
+        snippetId: 'test',
         code: largeCode
       }, {
         connectionId: client.connectionId,
@@ -558,7 +558,7 @@ describe('Server Edge Cases and Error Handling', () => {
 
       // Try to send edit request without desktop
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'test-textarea',
+        snippetId: 'test-snippet',
         code: 'test code',
         fileType: 'js'
       }, {
@@ -597,7 +597,7 @@ describe('Server Edge Cases and Error Handling', () => {
 
       // Send first edit request
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'textarea-1',
+        snippetId: 'snippet-1',
         code: 'first code',
         fileType: 'js'
       }, {
@@ -610,7 +610,7 @@ describe('Server Edge Cases and Error Handling', () => {
 
       // Send second edit request with same session ID (should overwrite)
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'textarea-2',
+        snippetId: 'snippet-2',
         code: 'second code',
         fileType: 'js'
       }, {
@@ -620,12 +620,12 @@ describe('Server Edge Cases and Error Handling', () => {
       }));
 
       await desktopClient.waitForMessage(msg => 
-        msg.type === 'edit_request' && msg.payload.textareaId === 'textarea-2'
+        msg.type === 'edit_request' && msg.payload.snippetId === 'snippet-2'
       );
 
       // Should have overwritten the session
       const session = server.activeSessions.get(sessionId);
-      expect(session.textareaId).toBe('textarea-2');
+      expect(session.snippetId).toBe('snippet-2');
 
       await browserClient.close();
       await desktopClient.close();
@@ -660,7 +660,7 @@ describe('Server Edge Cases and Error Handling', () => {
 
       // Start edit session
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'test-textarea',
+        snippetId: 'test-snippet',
         code: 'test code',
         fileType: 'js'
       }, {
@@ -837,7 +837,7 @@ describe('Server Edge Cases and Error Handling', () => {
       server.activeSessions.set('corrupted-session', {
         // Missing lastActivity field
         userId: 'test-user',
-        textareaId: 'test-textarea'
+        snippetId: 'test-snippet'
       });
 
       // Should handle gracefully
@@ -1127,7 +1127,7 @@ describe('Server Edge Cases and Error Handling', () => {
         const sessionId = `session-${i}`;
         const promise = (async () => {
           browserClient.send(global.testUtils.createMessage('edit_request', {
-            textareaId: `textarea-${i}`,
+            snippetId: `snippet-${i}`,
             code: `console.log("session ${i}");`,
             fileType: 'js'
           }, {
@@ -1247,7 +1247,7 @@ describe('Server Edge Cases and Error Handling', () => {
         sessionIds.push(sessionId);
         
         browserClient.send(global.testUtils.createMessage('edit_request', {
-          textareaId: `textarea-${i}`,
+          snippetId: `snippet-${i}`,
           code: `console.log("cleanup test ${i}");`,
           fileType: 'js'
         }, {

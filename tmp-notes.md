@@ -413,7 +413,8 @@ in server log I see this when pushing "Connect to Server" button:
 New WebSocket connection: e6d5ab59-14b5-47d9-95b0-478015739d13 from 127.0.0.1
 Error: Invalid connectionId: does not match connection (connection: e6d5ab59-14b5-47d9-95b0-478015739d13)
 127.0.0.1 - - [22/Jul/2025:19:48:20 +0000] "GET /web-ide-bridge/status HTTP/1.1" 200 - "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0"
-Error: Invalid connectionId: does not match connection (connection: e6d5ab59-14b5-47d9-95b0-478015739d13)```
+Error: Invalid connectionId: does not match connection (connection: e6d5ab59-14b5-47d9-95b0-478015739d13)
+```
 
 ------------------------------
 
@@ -627,6 +628,47 @@ not yet fixed:
 
 ------------------------------
 
+next enhance status messaging and display:
 
+the dektop app should show the Server <=> Browser status, and the web app should be made aware also of the Desktop <=> Server status.
+
+browser/web-ide-bridge.js
+- keep .isConnected() as is, it checks only for Browser <=> Server status
+- change .onStatusChange() to return { serverConnected: Boolen, desktopConnected: Boolean }
+- change message to/from server to make both sides aware of Server <=> Browser and Desktop <=> Server status
+
+browser/demo.html
+- enhance connection status to show also Server <=> Desktop status
+
+server/web-ide-bridge-server.js
+- change message to/from browser to make both sides aware of Server <=> Browser and Desktop <=> Server status
+- change message to/from desktop to make both sides aware of Server <=> Browser and Desktop <=> Server status
+
+desktop/web-ide-bridge.go
+- change message to/from desktop to make both sides aware of Server <=> Browser and Desktop <=> Server status
+- enhance connection status to show also Server <=> Browser status
+
+
+------------------------------
+
+next: enhance message handling
+
+browser/web-ide-bridge.js:
+- make injectButton feature optional with a constructor option `addButtons: true/false`, default `true` (some web apps want to control their own button bosition & style)
+- onCodeUpdate: in callback(snippetId, code) return message from integrated web app, which could be:
+    - Code updated in web editor field ${snipped}
+    - Error: Can't update code, editor is not in edit mode
+    - Error: Can't update code, unrecognized snippet ID ${snipped}
+- send info message back to server
+
+browser/demo.html:
+- use `addButtons: true` constructor option (default)
+
+server/web-ide-bridge-server.js:
+- route info message to desktop
+
+desktop/web-ide-bridge.go
+- handle info message from server
+- show info message in activity log (or more prominently somewhere else?)
 
 ------------------------------

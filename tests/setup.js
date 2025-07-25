@@ -211,7 +211,7 @@ global.testUtils = {
       type,
       connectionId: `test-conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId: 'test-user',
-      sessionId: `test-session-${Date.now()}`,
+      snippetId: `test-snippet-${Date.now()}`,
       payload,
       timestamp: Date.now(),
       ...overrides
@@ -234,7 +234,7 @@ global.testUtils = {
     return {
       userId,
       connectionId: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      sessionId: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      snippetId: `snippet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: Date.now(),
       profile: {
         name: `Test User ${userId}`,

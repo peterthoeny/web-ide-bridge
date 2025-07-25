@@ -40,7 +40,7 @@ describe('End-to-End Workflow Tests', () => {
 
       const workflow = await simulateEditWorkflow(browserClient, desktopClient, {
         sessionId: `edit-session-${user.userId}`,
-        textareaId: 'main-editor',
+        snippetId: 'main-editor',
         originalCode,
         updatedCode,
         fileType: 'js',
@@ -51,7 +51,7 @@ describe('End-to-End Workflow Tests', () => {
       expect(workflow.editRequest.payload.code).toBe(originalCode);
       expect(workflow.editRequest.payload.fileType).toBe('js');
       expect(workflow.codeUpdate.payload.code).toBe(updatedCode);
-      expect(workflow.codeUpdate.payload.textareaId).toBe('main-editor');
+      expect(workflow.codeUpdate.payload.snippetId).toBe('main-editor');
 
       await cleanup();
     });
@@ -64,7 +64,7 @@ describe('End-to-End Workflow Tests', () => {
       const workflows = await Promise.all([
         simulateEditWorkflow(browserClient, desktopClient, {
           sessionId: global.testUtils.generateId('js-session'),
-          textareaId: 'js-editor',
+          snippetId: 'js-editor',
           originalCode: 'console.log("js");',
           updatedCode: 'console.log("updated js");',
           fileType: 'js',
@@ -72,7 +72,7 @@ describe('End-to-End Workflow Tests', () => {
         }),
         simulateEditWorkflow(browserClient, desktopClient, {
           sessionId: global.testUtils.generateId('css-session'),
-          textareaId: 'css-editor', 
+          snippetId: 'css-editor', 
           originalCode: '.container { width: 100%; }',
           updatedCode: '.container { width: 100%; max-width: 1200px; }',
           fileType: 'css',
@@ -80,7 +80,7 @@ describe('End-to-End Workflow Tests', () => {
         }),
         simulateEditWorkflow(browserClient, desktopClient, {
           sessionId: global.testUtils.generateId('html-session'),
-          textareaId: 'html-editor',
+          snippetId: 'html-editor',
           originalCode: '<div>Hello</div>',
           updatedCode: '<div class="greeting">Hello World</div>',
           fileType: 'html', 
@@ -112,7 +112,7 @@ describe('End-to-End Workflow Tests', () => {
       const [workflow1, workflow2] = await Promise.all([
         simulateEditWorkflow(user1.browserClient, user1.desktopClient, {
           sessionId: global.testUtils.generateId('user1-session'),
-          textareaId: 'user1-editor',
+          snippetId: 'user1-editor',
           originalCode: 'const user1Code = "original";',
           updatedCode: 'const user1Code = "updated by user 1";',
           fileType: 'js',
@@ -120,7 +120,7 @@ describe('End-to-End Workflow Tests', () => {
         }),
         simulateEditWorkflow(user2.browserClient, user2.desktopClient, {
           sessionId: global.testUtils.generateId('user2-session'),
-          textareaId: 'user2-editor',
+          snippetId: 'user2-editor',
           originalCode: 'const user2Code = "original";',
           updatedCode: 'const user2Code = "updated by user 2";',
           fileType: 'js',
@@ -146,7 +146,7 @@ describe('End-to-End Workflow Tests', () => {
 
       // Start an edit session
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'reconnect-test',
+        snippetId: 'reconnect-test',
         code: 'const original = "code";',
         fileType: 'js'
       }, {
@@ -163,7 +163,7 @@ describe('End-to-End Workflow Tests', () => {
 
       // Browser should get error when trying new edit request
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'after-disconnect',
+        snippetId: 'after-disconnect',
         code: 'const afterDisconnect = true;',
         fileType: 'js'
       }, {
@@ -184,11 +184,11 @@ describe('End-to-End Workflow Tests', () => {
         await establishUserConnections(serverPort);
 
       const sessionId = global.testUtils.generateId('rapid-session');
-      const textareaId = 'rapid-editor';
+      const snippetId = 'rapid-editor';
 
       // Start edit session
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId,
+        snippetId,
         code: 'let counter = 0;',
         fileType: 'js'
       }, {
@@ -219,7 +219,7 @@ describe('End-to-End Workflow Tests', () => {
           msg.type === 'code_update' && 
           msg.payload.code === updates[i]
         );
-        expect(update.payload.textareaId).toBe(textareaId);
+        expect(update.payload.snippetId).toBe(snippetId);
       }
 
       await cleanup();
@@ -237,7 +237,7 @@ describe('End-to-End Workflow Tests', () => {
 
       const workflow = await simulateEditWorkflow(browserClient, desktopClient, {
         sessionId: global.testUtils.generateId('large-session'),
-        textareaId: 'large-editor',
+        snippetId: 'large-editor',
         originalCode: 'const small = "code";',
         updatedCode: largeCode,
         fileType: 'js',
@@ -272,7 +272,7 @@ describe('End-to-End Workflow Tests', () => {
       // Start edit session
       const sessionId = global.testUtils.generateId('cleanup-session');
       browserClient.send(global.testUtils.createMessage('edit_request', {
-        textareaId: 'cleanup-editor',
+        snippetId: 'cleanup-editor',
         code: 'const cleanup = true;',
         fileType: 'js'
       }, {

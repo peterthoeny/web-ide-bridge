@@ -177,35 +177,35 @@ describe('Server Performance and Load Testing', () => {
       // Each user performs multiple edit operations concurrently
       const editPromises = users.flatMap(({ userId, browserClient, desktopClient }) =>
         Array.from({ length: editCount }, async (_, editIndex) => {
-          const sessionId = `session-${userId}-${editIndex}`;
+          const snippetId = `snippet-${userId}-${editIndex}`;
           
           // Browser sends edit request
           browserClient.send(global.testUtils.createMessage('edit_request', {
-            textareaId: `textarea-${editIndex}`,
+            snippetId: snippetId,
             code: `console.log("Edit ${editIndex} by ${userId}");`,
             fileType: 'js'
           }, {
             connectionId: browserClient.connectionId,
             userId,
-            sessionId
+            snippetId
           }));
 
           // Desktop receives and responds
           const editRequest = await desktopClient.waitForMessage(msg => 
-            msg.type === 'edit_request' && msg.sessionId === sessionId
+            msg.type === 'edit_request' && msg.snippetId === snippetId
           );
 
           desktopClient.send(global.testUtils.createMessage('code_update', {
             code: `console.log("Updated edit ${editIndex} by ${userId}");`
           }, {
             connectionId: desktopClient.connectionId,
-            sessionId
+            snippetId
           }));
 
           // Browser receives update
           const codeUpdate = await browserClient.waitForMessage(msg =>
             msg.type === 'code_update' && 
-            msg.payload.textareaId === `textarea-${editIndex}`
+            msg.payload.snippetId === snippetId
           );
 
           return { editRequest, codeUpdate };
@@ -339,7 +339,7 @@ describe('Server Performance and Load Testing', () => {
       for (let i = 0; i < sessionCount; i++) {
         server.activeSessions.set(`expired-session-${i}`, {
           userId: `user-${i}`,
-          textareaId: `textarea-${i}`,
+          snippetId: `snippet-${i}`,
           browserConnectionId: `browser-${i}`,
           desktopConnectionId: `desktop-${i}`,
           createdAt: now - 10000,
@@ -351,7 +351,7 @@ describe('Server Performance and Load Testing', () => {
       for (let i = 0; i < 10; i++) {
         server.activeSessions.set(`current-session-${i}`, {
           userId: `current-user-${i}`,
-          textareaId: `current-textarea-${i}`,
+          snippetId: `current-snippet-${i}`,
           browserConnectionId: `current-browser-${i}`,
           desktopConnectionId: `current-desktop-${i}`,
           createdAt: now,
@@ -380,7 +380,7 @@ describe('Server Performance and Load Testing', () => {
         const sessionId = `perf-session-${i}`;
         server.activeSessions.set(sessionId, {
           userId: `user-${i}`,
-          textareaId: `textarea-${i}`,
+          snippetId: `snippet-${i}`,
           browserConnectionId: `browser-${i}`,
           desktopConnectionId: `desktop-${i}`,
           createdAt: Date.now(),

@@ -29,55 +29,48 @@ Web-IDE-Bridge provides a seamless bridge that allows you to:
 ## Project Structure
 
 ```
-Web-IDE-Bridge/
-├── README.md                           # Project documentation
-├── LICENSE                             # GPL v3 license file
-├── .gitignore                          # Git ignore patterns
-├── package.json                        # Root package configuration
-├── developer_context.md                # Technical implementation guide
-├── tests/                              # Centralized test directory
-│   ├── setup.js                        # Global test configuration
-│   ├── utils/                          # Shared test utilities
-│   │   └── websocket-utils.js          # WebSocket testing helpers
-│   ├── server/                         # Server-specific tests
-│   │   ├── server.test.js              # Core server functionality
-│   │   ├── websocket.test.js           # WebSocket protocol tests
-│   │   ├── sessions.test.js            # Session management tests
-│   │   ├── edge-cases.test.js          # Error handling and edge cases
-│   │   ├── performance.test.js         # Load and performance testing
-│   │   ├── integration.test.js         # Server integration tests
-│   │   └── comprehensive-validation.test.js # Complete validation suite
-│   ├── browser/                        # Browser library tests
-│   │   ├── client.test.js              # Client library functionality
-│   │   ├── integration.test.js         # Browser integration tests
-│   │   └── dom.test.js                 # DOM manipulation tests
-│   ├── desktop/                        # Desktop app tests
-│   │   ├── file-handling.test.js       # File operations tests
-│   │   └── ide-integration.test.js     # IDE launch and communication
-│   └── e2e/                            # End-to-end tests
-│       ├── full-workflow.test.js       # Complete user workflows
-│       ├── multi-user.test.js          # Multi-user scenarios
-│       └── error-recovery.test.js      # Error handling workflows
-├── browser/                            # Browser-side tier
+web-ide-bridge/
+├── README.md                       # Project documentation
+├── LICENSE                         # GPL v3 license file
+├── package.json                    # Root package configuration
+├── package-lock.json               # Locked dependencies
+├── developer_context.md            # Technical implementation guide
+├── browser/                        # Browser component
 │   ├── demo.html                       # Demo page with textarea forms
-│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library
-│   ├── web-ide-bridge.min.js          # Minified production version
+│   ├── jquery-demo.html                # jQuery-based custom UI demo
+│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (dev)
+│   ├── web-ide-bridge.min.js           # Minified production version
 │   ├── package.json                    # Browser package configuration
 │   ├── webpack.config.js               # Build configuration
-│   └── src/                            # Source files
+│   └── src/
 │       ├── client.js                   # Main client implementation
 │       ├── ui.js                       # UI components and styling
 │       └── utils.js                    # Utility functions
-├── desktop/                            # Desktop tier (Go/Fyne)
-│   ├── main.go                         # Main Go application
+├── desktop/                        # Desktop component
+│   ├── web-ide-bridge.go               # Main Go application (desktop app)
 │   ├── go.mod                          # Go module definition
-│   └── go.sum                          # Go module checksums
-└── server/                             # Server-side tier
-    ├── README.md                       # Points to repository root README
-    ├── package.json                    # Node.js package configuration
-    ├── package-lock.json               # Locked dependencies
-    ├── web-ide-bridge-server.conf      # Server configuration file
-    └── web-ide-bridge-server.js        # Node.js WebSocket server
+│   ├── go.sum                          # Go module checksums
+│   └── web-ide-bridge.conf             # Desktop app/org config (JSON)
+├── server/                         # Server component
+│   ├── README.md                       # Server-specific notes
+│   ├── package.json                    # Node.js package configuration
+│   ├── package-lock.json               # Locked dependencies
+│   ├── web-ide-bridge-server.conf      # Server configuration file (JSON)
+│   └── web-ide-bridge-server.js        # Node.js WebSocket server
+└── tests/                          # Test infrastructure
+    ├── setup.js                        # Global test configuration
+    ├── browser/                        # Browser library tests
+    ├── desktop/                        # Desktop app tests
+    ├── e2e/                            # End-to-end tests
+    │   └── full-workflow.test.js       # Complete user workflows
+    ├── server/                         # Server-specific tests
+    │   ├── basic.test.js               # Basic server tests
+    │   ├── edge-cases.test.js          # Error handling and edge cases
+    │   ├── performance.test.js         # Load and performance testing
+    │   ├── server.test.js              # Core server functionality
+    │   └── validation.test.js          # Validation logic tests
+    └── utils/
+        └── websocket-utils.js          # WebSocket testing helpers
 ```
 
 ## Architecture
@@ -224,43 +217,36 @@ Configure your preferred IDE and WebSocket server URL on first launch.
 <script src="/path/to/web-ide-bridge/web-ide-bridge.min.js"></script>
 
 <script>
-// Initialize Web-IDE-Bridge
+// Initialize Web-IDE-Bridge (default: addButtons: true)
 const webIdeBridge = new WebIdeBridge('your-user-id', {
-    serverUrl: 'ws://localhost:8071/web-ide-bridge/ws',
-    debug: false
+    serverUrl: 'ws://localhost:8071/web-ide-bridge/ws', // WebSocket server URL
+    autoReconnect: true,        // Automatically reconnect on disconnect
+    reconnectInterval: 5000,    // ms between reconnect attempts
+    maxReconnectAttempts: 10,   // Max reconnect attempts
+    heartbeatInterval: 30000,   // ms between ping/pong
+    connectionTimeout: 10000,   // ms to wait for connection
+    debug: false,               // Enable debug logging
+    addButtons: true            // Auto-injects "Edit in IDE" buttons (default: true)
 });
 
 // Connect to server
 await webIdeBridge.connect();
 
-// Add external editor capability to textareas
-webIdeBridge.onCodeUpdate((id, updatedCode) => {
-    // Update textarea when code returns from IDE
-    document.getElementById(id).value = updatedCode;
-    
-    // Trigger change events for frameworks
-    document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
+// Handle code updates from IDE
+webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
+    document.getElementById(snippetId).value = updatedCode;
+    document.getElementById(snippetId).dispatchEvent(new Event('input', { bubbles: true }));
 });
 
-// Add event listeners to "Edit in IDE ↗" buttons
-document.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('edit-in-ide-btn')) {
-        const textareaId = e.target.dataset.textareaId;
-        const textarea = document.getElementById(textareaId);
-        const fileType = e.target.dataset.fileType || 'txt';
-        
-        if (textarea && webIdeBridge.isConnected()) {
-            await webIdeBridge.editCodeSnippet(textareaId, textarea.value, fileType);
-        }
-    }
-});
+// With addButtons: true (default):
+// - The library automatically injects "Edit in IDE" buttons next to all <textarea> elements.
+// - Button clicks are handled for you, sending code to the desktop IDE.
+// - This is the simplest way to add IDE integration to your app.
 
-// Automatic button injection
-webIdeBridge.autoInjectButtons({
-    selector: 'textarea[data-language]',
-    buttonText: 'Edit in IDE ↗',
-    buttonClass: 'edit-in-ide-btn'
-});
+// With addButtons: false:
+// - The library does NOT inject any UI.
+// - You have full control: create your own buttons, handle clicks, and call webIdeBridge.editCodeSnippet() as needed.
+// - See browser/jquery-demo.html for a custom integration example.
 </script>
 ```
 
@@ -452,15 +438,34 @@ location /web-ide-bridge/ws {
 
 ### 🖥️ Desktop App Configuration
 
-Configure through the desktop application settings interface:
+The desktop app supports an app/org config file at `desktop/web-ide-bridge.conf` (JSON format). This file can specify:
+- Default IDEs per OS (for auto-detection on first run)
+- Default WebSocket URLs for dev and prod
+- Any other org-specific defaults
 
-- **WebSocket URL**: Server connection endpoint
-  - Development: `ws://localhost:8071/web-ide-bridge/ws`
-  - Production: `wss://webapp.example.com/web-ide-bridge/ws`
-- **Preferred IDE**: Command to launch your IDE
-- **User ID**: Identifier for session routing (defaults to OS username)
-- **Auto-launch**: Start with system boot
-- **Debug Mode**: Enable verbose logging and debugging features
+Example:
+```json
+{
+  "default_ides": {
+    "darwin": ["Visual Studio Code", "Cursor", "Xcode", "TextEdit"],
+    "windows": ["notepad.exe"],
+    "linux": ["gedit"]
+  },
+  "default_ws_url": {
+    "dev": "ws://localhost:8071/web-ide-bridge/ws",
+    "prod": "wss://webapp.example.com/web-ide-bridge/ws"
+  }
+}
+```
+
+The desktop app loads config in this order (first found wins):
+1. `$WEB_IDE_BRIDGE_CONFIG` (env var)
+2. `desktop/web-ide-bridge.conf` (project default)
+3. `/etc/web-ide-bridge.conf` (system/org-wide)
+4. `~/.web-ide-bridge/config.json` (user-specific, for runtime/user settings)
+5. Built-in defaults
+
+On macOS, the app will auto-detect the first available IDE from the list for the current OS. You can customize this list for your org or deployment.
 
 ## 📊 Monitoring and Observability
 
@@ -529,25 +534,30 @@ Web-IDE-Bridge implements multiple security layers:
 ### Connection Issues
 
 **1. Check Server Status**
-```bash
-# Visit status page
-curl http://localhost:8071/web-ide-bridge/health
-
-# Check server logs
-cd server && npm start
-```
+- Visit the status page: [http://localhost:8071/web-ide-bridge/health](http://localhost:8071/web-ide-bridge/health)
+- Check server logs: `cd server && npm start`
 
 **2. Verify WebSocket Connection**
-- Ensure WebSocket URL is correct in desktop app
-- Check firewall settings for WebSocket port
-- Verify network connectivity between components
+- Ensure the WebSocket URL is correct in both the browser and desktop app.
+- Check firewall settings for the WebSocket port (default: 8071).
+- Verify network connectivity between browser, server, and desktop.
 
 **3. Browser Console Errors**
-```javascript
-// Check browser console for WebSocket errors
-// Look for connection failures or message errors
-console.log('WebSocket state:', webIdeBridge.getConnectionState());
-```
+- Open the browser console and look for WebSocket errors or message errors.
+- Use `webIdeBridge.getConnectionState()` to check connection status.
+
+**4. Desktop App Status**
+- Check the desktop app's status indicators for connection to the server and browser.
+- If the desktop app is not connected, verify the WebSocket URL and network.
+
+**5. Debugging**
+- Enable debug logging: `DEBUG=true npm start` (server) or set debug: true in the browser library.
+- Use the debug endpoint: `curl http://localhost:8071/web-ide-bridge/debug`
+
+**6. Common Issues**
+- If the IDE does not launch, check the IDE command in the desktop app settings and test it from the terminal.
+- If code changes are not syncing, ensure both browser and desktop are connected and the web app is in edit mode.
+- For file permission issues, ensure the desktop app can write to the temp directory and the IDE can access those files.
 
 ### IDE Launch Issues
 
@@ -639,7 +649,15 @@ cd web-ide-bridge
 npm install
 cd server && npm install && cd ..
 cd browser && npm install && cd ..
-cd desktop && npm install && cd ..
+# For desktop (Go/Fyne):
+cd desktop
+# Install Go dependencies (if needed)
+go mod tidy
+# Run the desktop app in development mode
+go run web-ide-bridge.go
+# Or build a binary for your platform
+go build -o web-ide-bridge web-ide-bridge.go
+cd ..
 
 # Run tests to ensure everything works
 npm test

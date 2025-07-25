@@ -585,7 +585,7 @@ async function establishUserConnections(serverPort, userId = null, options = {})
 async function simulateEditWorkflow(browserClient, desktopClient, options = {}) {
   const {
     sessionId = global.testUtils.generateId('session'),
-    textareaId = 'textarea-test',
+    snippetId = 'textarea-test',
     originalCode = 'console.log("hello");',
     updatedCode = 'console.log("hello world");',
     fileType = 'js',
@@ -596,7 +596,7 @@ async function simulateEditWorkflow(browserClient, desktopClient, options = {}) 
   
   const workflow = {
     sessionId,
-    textareaId,
+    snippetId,
     originalCode,
     updatedCode,
     startTime: Date.now()
@@ -609,7 +609,7 @@ async function simulateEditWorkflow(browserClient, desktopClient, options = {}) 
       userId,
       sessionId,
       payload: {
-        textareaId,
+        snippetId,
         code: originalCode,
         fileType
       }
@@ -639,7 +639,7 @@ async function simulateEditWorkflow(browserClient, desktopClient, options = {}) 
     
     // Step 4: Browser receives code update
     const codeUpdate = await browserClient.waitForMessage(msg =>
-      msg.type === 'code_update' && msg.payload.textareaId === textareaId,
+      msg.type === 'code_update' && msg.payload.snippetId === snippetId,
       timeout
     );
     
@@ -698,7 +698,7 @@ async function createConnectedTestClient(serverPort, endpoint = '/web-ide-bridge
  */
 async function simulateConcurrentEdits(users, editCount = 3, options = {}) {
   const {
-    baseTextareaId = 'textarea',
+    baseSnippetId = 'textarea',
     baseCode = 'console.log("edit");',
     fileType = 'js',
     timeout = 10000
@@ -715,7 +715,7 @@ async function simulateConcurrentEdits(users, editCount = 3, options = {}) {
         user.desktopClient,
         {
           sessionId: global.testUtils.generateId(`user${userIndex}-edit${editIndex}`),
-          textareaId: `${baseTextareaId}-${userIndex}-${editIndex}`,
+          snippetId: `${baseSnippetId}-${userIndex}-${editIndex}`,
           originalCode: `${baseCode} // User ${userIndex}, Edit ${editIndex}`,
           updatedCode: `${baseCode} // Updated by User ${userIndex}, Edit ${editIndex}`,
           fileType,
