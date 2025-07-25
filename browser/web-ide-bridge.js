@@ -145,9 +145,8 @@
     updateButtonStates(connected) {
       this.injectedButtons.forEach(button => {
         button.disabled = !connected;
-        button.textContent = connected ? 
-          button.dataset.originalText : 
-          'Connect to Server First';
+        // Always show the original text, do not change to 'Connect to Server First'
+        button.textContent = button.dataset.originalText;
       });
     }
 
@@ -311,6 +310,7 @@
     }
 
     _createAndInjectButton(textarea, config) {
+      // Only add a single [Edit in IDE] button below each textarea, no type selector
       const container = document.createElement('div');
       container.className = 'web-ide-bridge-container';
 
@@ -322,53 +322,11 @@
       button.dataset.originalText = config.buttonText;
       button.disabled = !this.webIdeBridge.isConnected();
 
-      const fileTypeSelect = document.createElement('select');
-      fileTypeSelect.className = 'web-ide-bridge-file-type';
-      fileTypeSelect.value = config.fileType;
-
-      const fileTypes = [
-        { value: 'txt', label: 'Text (.txt)' },
-        { value: 'js', label: 'JavaScript (.js)' },
-        { value: 'ts', label: 'TypeScript (.ts)' },
-        { value: 'jsx', label: 'React JSX (.jsx)' },
-        { value: 'tsx', label: 'React TSX (.tsx)' },
-        { value: 'css', label: 'CSS (.css)' },
-        { value: 'scss', label: 'SCSS (.scss)' },
-        { value: 'less', label: 'Less (.less)' },
-        { value: 'html', label: 'HTML (.html)' },
-        { value: 'xml', label: 'XML (.xml)' },
-        { value: 'json', label: 'JSON (.json)' },
-        { value: 'yaml', label: 'YAML (.yaml)' },
-        { value: 'py', label: 'Python (.py)' },
-        { value: 'java', label: 'Java (.java)' },
-        { value: 'cpp', label: 'C++ (.cpp)' },
-        { value: 'c', label: 'C (.c)' },
-        { value: 'php', label: 'PHP (.php)' },
-        { value: 'rb', label: 'Ruby (.rb)' },
-        { value: 'go', label: 'Go (.go)' },
-        { value: 'rs', label: 'Rust (.rs)' },
-        { value: 'sh', label: 'Shell (.sh)' },
-        { value: 'sql', label: 'SQL (.sql)' },
-        { value: 'md', label: 'Markdown (.md)' }
-      ];
-
-      fileTypes.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type.value;
-        option.textContent = type.label;
-        fileTypeSelect.appendChild(option);
-      });
-
-      fileTypeSelect.addEventListener('change', () => {
-        button.dataset.fileType = fileTypeSelect.value;
-      });
-
       button.addEventListener('click', async () => {
         if (!this.webIdeBridge.isConnected()) {
           alert('Please connect to Web-IDE-Bridge server first');
           return;
         }
-
         try {
           const code = textarea.value;
           const fileType = button.dataset.fileType;
@@ -380,7 +338,6 @@
       });
 
       container.appendChild(button);
-      container.appendChild(fileTypeSelect);
 
       switch (config.position) {
         case 'before':
@@ -399,7 +356,7 @@
       this.injectedButtons.set(textarea.id, button);
 
       this.webIdeBridge.onStatusChange((status) => {
-        this.updateButtonStates(status === 'connected');
+        this.updateButtonStates(status.serverConnected);
       });
 
       return button;
@@ -459,6 +416,7 @@
         heartbeatInterval: 30000,
         connectionTimeout: 10000,
         debug: false,
+        addButtons: true, // new option
         ...options
       };
 
@@ -473,6 +431,7 @@
       this.reconnectTimeout = null;
       this.heartbeatTimeout = null;
       this.connectionTimeout = null;
+      this.desktopConnected = false;
 
       this.statusCallbacks = [];
       this.codeUpdateCallbacks = [];
@@ -480,6 +439,9 @@
       this.messageCallbacks = [];
 
       this.uiManager = new UIManager(this);
+      if (this.options.addButtons) {
+        this.uiManager.autoInjectButtons();
+      }
       this.debouncedReconnect = debounce(this._attemptReconnect.bind(this), 1000);
 
       this._log('WebIdeBridge initialized', { userId, connectionId: this.connectionId });
@@ -492,7 +454,7 @@
       }
 
       this.connecting = true;
-      this._updateStatus('connecting');
+      this._updateStatus();
 
       try {
         await this._establishConnection();
@@ -518,7 +480,7 @@
 
       this.connected = false;
       this.connecting = false;
-      this._updateStatus('disconnected');
+      this._updateStatus();
     }
 
     isConnected() {
@@ -531,38 +493,48 @@
       return 'disconnected';
     }
 
-    async editCodeSnippet(textareaId, code, fileType = 'txt') {
+    async editCodeSnippet(snippetId, code, fileType = 'txt') {
       if (!this.connected) {
         throw new Error('Not connected to server');
       }
 
-      if (!textareaId || typeof textareaId !== 'string') {
-        throw new Error('textareaId is required and must be a string');
+      if (!snippetId || typeof snippetId !== 'string') {
+        throw new Error('snippetId is required and must be a string');
       }
 
       if (typeof code !== 'string') {
         throw new Error('code must be a string');
       }
 
-      const sessionId = generateUUID();
-
       const message = {
         type: 'edit_request',
         connectionId: this.connectionId,
         userId: this.userId,
-        sessionId,
         payload: {
-          textareaId,
+          snippetId,
           code,
           fileType: fileType || 'txt',
           timestamp: Date.now()
         }
       };
 
-      this._log('Sending edit request', { textareaId, fileType, sessionId });
+      this._log('Sending edit request', { snippetId, fileType });
       this._sendMessage(message);
 
-      return sessionId;
+      // If addButtons is false, send info message to server
+      if (this.options.addButtons === false) {
+        this._sendMessage({
+          type: 'info',
+          connectionId: this.connectionId,
+          userId: this.userId,
+          payload: {
+            snippetId,
+            message: 'code has been updated in the web application'
+          }
+        });
+      }
+
+      return snippetId;
     }
 
     onStatusChange(callback) {
@@ -570,7 +542,10 @@
         throw new Error('Callback must be a function');
       }
       this.statusCallbacks.push(callback);
-      callback(this.getConnectionState());
+      callback({
+        serverConnected: this.connected,
+        desktopConnected: this.desktopConnected
+      });
     }
 
     onCodeUpdate(callback) {
@@ -642,7 +617,7 @@
     _handleConnectionOpen() {
       this.connected = true;
       this.connecting = false;
-      this._updateStatus('connected');
+      this._updateStatus();
       // Send browser_connect immediately
       const connectMessage = {
         type: 'browser_connect',
@@ -660,7 +635,7 @@
       this.connected = false;
       this.connecting = false;
       this._clearTimeouts();
-      this._updateStatus('disconnected');
+      this._updateStatus();
 
       if (this.options.autoReconnect && event.code !== 1000) {
         this._scheduleReconnect();
@@ -710,6 +685,10 @@
             this._handleServerError(message);
             break;
 
+          case 'status_update':
+            this._handleStatusUpdate(message);
+            break;
+
           default:
             this._log('Unknown message type', message.type);
         }
@@ -731,27 +710,55 @@
     }
 
     _handleCodeUpdate(message) {
-      if (!message.payload || !message.payload.textareaId) {
+      if (!message.payload || !message.payload.snippetId) {
         this._log('Invalid code update message', message);
         return;
       }
 
-      const { textareaId, code } = message.payload;
-      this._log('Received code update', { textareaId, codeLength: code.length });
+      const { snippetId, code } = message.payload;
+      this._log('Received code update', { snippetId, codeLength: code.length });
 
       this.codeUpdateCallbacks.forEach(callback => {
         try {
-          callback(textareaId, code);
+          const result = callback(snippetId, code);
+          if (typeof result === 'string' && result.trim()) {
+            // Send info message to server
+            this._sendMessage({
+              type: 'info',
+              connectionId: this.connectionId,
+              userId: this.userId,
+              payload: { snippetId, message: result }
+            });
+          }
         } catch (error) {
           this._log('Error in code update callback', error);
         }
       });
+      // If addButtons is true, send info message to server
+      if (this.options.addButtons !== false) {
+        this._sendMessage({
+          type: 'info',
+          connectionId: this.connectionId,
+          userId: this.userId,
+          payload: {
+            snippetId,
+            message: 'code has been updated in the web application'
+          }
+        });
+      }
     }
 
     _handleServerError(message) {
       const errorMsg = message.payload?.message || 'Unknown server error';
       this._log('Server error', errorMsg);
       this._triggerErrorCallbacks(errorMsg);
+    }
+
+    _handleStatusUpdate(message) {
+      if (typeof message.desktopConnected === 'boolean') {
+        this.desktopConnected = message.desktopConnected;
+        this._updateStatus();
+      }
     }
 
     _sendMessage(message) {
@@ -847,12 +854,13 @@
       this._clearHeartbeat();
     }
 
-    _updateStatus(status) {
-      this._log('Status changed to', status);
-
+    _updateStatus() {
       this.statusCallbacks.forEach(callback => {
         try {
-          callback(status);
+          callback({
+            serverConnected: this.connected,
+            desktopConnected: this.desktopConnected
+          });
         } catch (error) {
           this._log('Error in status callback', error);
         }

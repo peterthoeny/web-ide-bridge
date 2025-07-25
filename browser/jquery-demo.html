@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web-IDE-Bridge Demo</title>
+    <title>Web-IDE-Bridge jQuery Demo</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -265,6 +266,37 @@
             align-items: center;
         }
 
+        .edit-in-ide-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .edit-in-ide-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .edit-in-ide-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .edit-in-ide-btn:disabled {
+            background: #9ca3af;
+            color: #fff;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
         .status-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -411,11 +443,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">Web-IDE-Bridge Demo</h1>
-            <p class="subtitle">Experience seamless code editing between web applications and desktop IDEs</p>
+            <h1 class="title">Web-IDE-Bridge jQuery Demo</h1>
+            <p class="subtitle">Custom UI integration using jQuery and Web-IDE-Bridge</p>
             <span class="version">v0.1.3</span>
         </div>
-
+        <!-- (Copy the rest of the HTML structure from demo.html, but do NOT include any auto-injected buttons) -->
         <div class="instructions">
             <h3>🚀 Getting Started</h3>
             <ol>
@@ -427,13 +459,12 @@
                 <li>Make changes in your IDE and save (Ctrl+S/Cmd+S) to see them sync back instantly</li>
             </ol>
         </div>
-
+        <!-- (Configuration, status, and log sections as in demo.html) -->
         <div class="demo-section">
             <h2 class="section-title">⚙️ Configuration</h2>
             <p class="section-description">
                 Configure your Web-IDE-Bridge connection settings.
             </p>
-
             <div class="config-row">
                 <div class="config-field">
                     <label class="config-label" for="wsUrl">WebSocket URL:</label>
@@ -448,45 +479,40 @@
                     <input type="number" id="reconnectTime" class="config-input" value="10000" min="1000" max="60000">
                 </div>
             </div>
-
             <button id="demoToggleBtn" class="demo-toggle-btn" onclick="toggleEditDemo()">
                 Open Edit Demo ⬇
             </button>
         </div>
-
         <div id="editDemoSection" class="edit-demo-section">
             <div class="edit-demo-header">
                 📝 Edit Demo - Code Editors
             </div>
             <div class="edit-demo-content">
                 <div class="code-container">
-                    <label class="code-label" for="javascript-123">JavaScript Code:</label>
-                    <textarea class="code-textarea" id="javascript-123" data-type="js">// Web-IDE-Bridge Demo - JavaScript
+                    <label class="code-label" for="jquery-js-1">JavaScript Code:</label>
+                    <textarea class="code-textarea" id="jquery-js-1" data-type="js">// Web-IDE-Bridge Demo - JavaScript
 function calculateFibonacci(n) {
     if (n <= 1) {
         return n;
     }
-
     let a = 0, b = 1;
     for (let i = 2; i <= n; i++) {
         const temp = a + b;
         a = b;
         b = temp;
     }
-
     return b;
 }
-
 // Test the function
 console.log('Fibonacci sequence:');
 for (let i = 0; i < 10; i++) {
     console.log(`F(${i}) = ${calculateFibonacci(i)}`);
 }</textarea>
+                    <button class="edit-in-ide-btn" data-textarea-id="jquery-js-1" data-file-type="js">Edit in IDE ↗</button>
                 </div>
-
                 <div class="code-container">
-                    <label class="code-label" for="html-456">HTML Template:</label>
-                    <textarea class="code-textarea" id="html-456" data-type="html"><!-- Web-IDE-Bridge Demo - HTML -->
+                    <label class="code-label" for="jquery-html-2">HTML Template:</label>
+                    <textarea class="code-textarea" id="jquery-html-2" data-type="html"><!-- Web-IDE-Bridge Demo - HTML -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -501,12 +527,10 @@ for (let i = 0; i < 10; i++) {
             padding: 1.5rem;
             margin: 1rem 0;
         }
-
         .component h2 {
             color: #2d3748;
             margin-bottom: 1rem;
         }
-
         .component p {
             color: #4a5568;
             line-height: 1.6;
@@ -519,23 +543,22 @@ for (let i = 0; i < 10; i++) {
         <p>This is a demo component created with Web-IDE-Bridge. 
            Edit this HTML in your favorite IDE with full tag completion 
            and syntax highlighting.</p>
-
         <button onclick="alert('Hello from Web-IDE-Bridge!')">
             Click Me
         </button>
     </div>
 </body>
 </html></textarea>
+                    <button class="edit-in-ide-btn" data-textarea-id="jquery-html-2" data-file-type="html">Edit in IDE ↗</button>
                 </div>
             </div>
         </div>
-
+        <!-- (Status and log sections as in demo.html) -->
         <div class="demo-section">
             <h2 class="section-title">📊 Connection Status</h2>
             <p class="section-description">
                 Real-time connection status between browser, server, and desktop application.
             </p>
-
             <div class="status-grid">
                 <div class="status-card">
                     <div class="status-card-title">Browser ↔ Server</div>
@@ -547,7 +570,6 @@ for (let i = 0; i < 10; i++) {
                         </div>
                     </div>
                 </div>
-
                 <div class="status-card">
                     <div class="status-card-title">Server ↔ Desktop</div>
                     <div class="status-indicator">
@@ -558,7 +580,6 @@ for (let i = 0; i < 10; i++) {
                         </div>
                     </div>
                 </div>
-
                 <div class="status-card">
                     <div class="status-card-title">Session Info</div>
                     <div class="status-indicator">
@@ -571,17 +592,15 @@ for (let i = 0; i < 10; i++) {
                 </div>
             </div>
         </div>
-
         <div class="demo-section">
             <h2 class="section-title">📊 Activity Log</h2>
             <p class="section-description">
                 Real-time log of Web-IDE-Bridge activities and connection status.
             </p>
             <div class="log-container" id="activityLog">
-                <div class="log-entry info">Ready to start Web-IDE-Bridge demo...</div>
+                <div class="log-entry info">Ready to start Web-IDE-Bridge jQuery demo...</div>
             </div>
         </div>
-
         <div class="footer">
             <p>
                 <a href="/web-ide-bridge/status">Server Status</a>
@@ -589,242 +608,199 @@ for (let i = 0; i < 10; i++) {
                 <a href="../README.md">Documentation</a>
             </p>
             <p style="margin-top: 0.5rem;">
-                Web-IDE-Bridge Demo - Bridge web applications to desktop IDEs
+                Web-IDE-Bridge jQuery Demo - Custom UI integration
             </p>
         </div>
     </div>
-
-    <!-- Include the Web-IDE-Bridge library -->
     <script src="web-ide-bridge.js"></script>
-
     <script>
-        // Global variables
-        let webIdeBridge = null;
-        let isConnected = false;
-        let isEditDemoOpen = false;
-        let persistentConnectionId = null;
-
-        // DOM elements
-        const demoToggleBtn = document.getElementById('demoToggleBtn');
-        const editDemoSection = document.getElementById('editDemoSection');
-        const activityLog = document.getElementById('activityLog');
-
-        // Status elements
-        const browserServerDot = document.getElementById('browserServerDot');
-        const browserServerStatus = document.getElementById('browserServerStatus');
-        const browserServerDetails = document.getElementById('browserServerDetails');
-        const serverDesktopDot = document.getElementById('serverDesktopDot');
-        const serverDesktopStatus = document.getElementById('serverDesktopStatus');
-        const serverDesktopDetails = document.getElementById('serverDesktopDetails');
-        const sessionDot = document.getElementById('sessionDot');
-        const sessionStatus = document.getElementById('sessionStatus');
-        const sessionDetails = document.getElementById('sessionDetails');
-
-        // Config elements
-        const wsUrlInput = document.getElementById('wsUrl');
-        const userInput = document.getElementById('user');
-        const reconnectTimeInput = document.getElementById('reconnectTime');
-
-        // Generate persistent connection ID once and store it
-        function generatePersistentConnectionId() {
-            if (!persistentConnectionId) {
-                persistentConnectionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                    const r = Math.random() * 16 | 0;
-                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                    return v.toString(16);
-                });
-                logActivity(`Generated persistent connection ID: ${persistentConnectionId}`, 'info');
-            }
-            return persistentConnectionId;
+    // jQuery-based demo logic for Web-IDE-Bridge
+    let webIdeBridge = null;
+    let isConnected = false;
+    let isEditDemoOpen = false;
+    let persistentConnectionId = null;
+    // DOM elements
+    const activityLog = document.getElementById('activityLog');
+    // Status elements
+    const browserServerDot = document.getElementById('browserServerDot');
+    const browserServerStatus = document.getElementById('browserServerStatus');
+    const browserServerDetails = document.getElementById('browserServerDetails');
+    const serverDesktopDot = document.getElementById('serverDesktopDot');
+    const serverDesktopStatus = document.getElementById('serverDesktopStatus');
+    const serverDesktopDetails = document.getElementById('serverDesktopDetails');
+    const sessionDot = document.getElementById('sessionDot');
+    const sessionStatus = document.getElementById('sessionStatus');
+    const sessionDetails = document.getElementById('sessionDetails');
+    // Config elements
+    const wsUrlInput = document.getElementById('wsUrl');
+    const userInput = document.getElementById('user');
+    const reconnectTimeInput = document.getElementById('reconnectTime');
+    // Generate persistent connection ID once and store it
+    function generatePersistentConnectionId() {
+        if (!persistentConnectionId) {
+            persistentConnectionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+            logActivity(`Generated persistent connection ID: ${persistentConnectionId}`, 'info');
         }
-
-        // Utility functions
-        function logActivity(message, type = 'info') {
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${type}`;
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            activityLog.appendChild(logEntry);
-            activityLog.scrollTop = activityLog.scrollHeight;
-
-            // Keep only last 50 log entries
-            while (activityLog.children.length > 50) {
-                activityLog.removeChild(activityLog.firstChild);
-            }
+        return persistentConnectionId;
+    }
+    function logActivity(message, type = 'info') {
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        activityLog.appendChild(logEntry);
+        activityLog.scrollTop = activityLog.scrollHeight;
+        while (activityLog.children.length > 50) {
+            activityLog.removeChild(activityLog.firstChild);
         }
-
-        function updateBrowserServerStatus(isConnected) {
-            const statusInfo = isConnected
-                ? { dot: 'connected', text: 'Connected' }
-                : { dot: 'disconnected', text: 'Disconnected' };
-            browserServerDot.className = `status-dot ${statusInfo.dot}`;
-            browserServerStatus.textContent = statusInfo.text;
-            browserServerDetails.textContent = statusInfo.text.toLowerCase();
+    }
+    function updateBrowserServerStatus(isConnected) {
+        const statusInfo = isConnected
+            ? { dot: 'connected', text: 'Connected' }
+            : { dot: 'disconnected', text: 'Disconnected' };
+        browserServerDot.className = `status-dot ${statusInfo.dot}`;
+        browserServerStatus.textContent = statusInfo.text;
+        browserServerDetails.textContent = statusInfo.text.toLowerCase();
+    }
+    function updateServerDesktopStatus(status) {
+        if (status) {
+            serverDesktopDot.className = 'status-dot connected';
+            serverDesktopStatus.textContent = 'Connected';
+            serverDesktopDetails.textContent = 'Desktop app connected';
+        } else {
+            serverDesktopDot.className = 'status-dot disconnected';
+            serverDesktopStatus.textContent = 'Not Connected';
+            serverDesktopDetails.textContent = 'Desktop app not detected';
         }
-
-        function updateServerDesktopStatus(status) {
-            if (status) {
-                serverDesktopDot.className = 'status-dot connected';
-                serverDesktopStatus.textContent = 'Connected';
-                serverDesktopDetails.textContent = 'Desktop app connected';
-            } else {
-                serverDesktopDot.className = 'status-dot disconnected';
-                serverDesktopStatus.textContent = 'Not Connected';
-                serverDesktopDetails.textContent = 'Desktop app not detected';
-            }
+    }
+    function updateSessionStatus(status, details = '') {
+        const statusMap = {
+            'ready': { dot: '', text: 'Ready' },
+            'active': { dot: 'connected', text: 'Active' },
+            'error': { dot: 'disconnected', text: 'Error' }
+        };
+        const statusInfo = statusMap[status] || statusMap['ready'];
+        sessionDot.className = `status-dot ${statusInfo.dot}`;
+        sessionStatus.textContent = statusInfo.text;
+        sessionDetails.textContent = details || statusInfo.text.toLowerCase();
+    }
+    // Main demo toggle function
+    window.toggleEditDemo = async function() {
+        if (!isEditDemoOpen) {
+            await openEditDemo();
+        } else {
+            await closeEditDemo();
         }
-
-        function updateSessionStatus(status, details = '') {
-            const statusMap = {
-                'ready': { dot: '', text: 'Ready' },
-                'active': { dot: 'connected', text: 'Active' },
-                'error': { dot: 'disconnected', text: 'Error' }
-            };
-
-            const statusInfo = statusMap[status] || statusMap['ready'];
-
-            sessionDot.className = `status-dot ${statusInfo.dot}`;
-            sessionStatus.textContent = statusInfo.text;
-            sessionDetails.textContent = details || statusInfo.text.toLowerCase();
-        }
-
-        // Main demo toggle function
-        async function toggleEditDemo() {
-            if (!isEditDemoOpen) {
-                await openEditDemo();
-            } else {
-                await closeEditDemo();
-            }
-        }
-
-        async function openEditDemo() {
-            try {
-                logActivity('Opening edit demo...', 'info');
-
-                // Update button state
-                demoToggleBtn.textContent = 'Close Edit Demo ⬆';
-                demoToggleBtn.className = 'demo-toggle-btn close';
-
-                // Show edit section
-                editDemoSection.className = 'edit-demo-section show';
-                isEditDemoOpen = true;
-
-                // Get configuration
-                const wsUrl = wsUrlInput.value.trim();
-                const user = userInput.value.trim() || 'peter';
-                const reconnectTime = parseInt(reconnectTimeInput.value) || 10000;
-
-                const connectionId = generatePersistentConnectionId();
-                logActivity(`Using user: ${user}`, 'info');
-                logActivity(`Using persistent connection ID: ${connectionId}`, 'info');
-                logActivity(`Connecting to: ${wsUrl}`, 'info');
-
-                updateSessionStatus('active', `User: ${user}, Reconnect: ${reconnectTime}ms`);
-
-                // Initialize Web-IDE-Bridge with user as userId and persistent connectionId
-                webIdeBridge = new WebIdeBridge(user, {
-                    serverUrl: wsUrl,
-                    reconnectInterval: reconnectTime,
-                    autoReconnect: true,
-                    debug: true,
-                    connectionId: connectionId,
-                    addButtons: true
-                });
-
-                // Set up event handlers
-                webIdeBridge.onStatusChange((status) => {
-                    isConnected = status.serverConnected;
-                    updateBrowserServerStatus(status.serverConnected);
-                    updateServerDesktopStatus(status.desktopConnected);
-                    logActivity(`Browser-Server connection: ${status.serverConnected ? 'connected' : 'disconnected'}`, status.serverConnected ? 'success' : 'info');
-                    logActivity(`Desktop connection: ${status.desktopConnected ? 'connected' : 'disconnected'}`, status.desktopConnected ? 'success' : 'info');
-                });
-
-                webIdeBridge.onCodeUpdate((textareaId, updatedCode) => {
-                    const textarea = document.getElementById(textareaId);
-                    if (textarea) {
-                        textarea.value = updatedCode;
-                        logActivity(`Code updated for ${textareaId}`, 'success');
-                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                });
-
-                webIdeBridge.onError((error) => {
-                    logActivity(`Error: ${error}`, 'error');
-                    updateSessionStatus('error', error);
-                });
-
-                // Connect to server
-                updateBrowserServerStatus(false); // Start as disconnected
-                await webIdeBridge.connect();
-                logActivity('Successfully connected to Web-IDE-Bridge server!', 'success');
-
-            } catch (error) {
-                logActivity(`Failed to open edit demo: ${error.message}`, 'error');
-                updateBrowserServerStatus(false);
-                updateSessionStatus('error', error.message);
-                await closeEditDemo();
-            }
-        }
-
-        async function closeEditDemo() {
-            logActivity('Closing edit demo...', 'info');
-
-            // Update button state
-            demoToggleBtn.textContent = 'Open Edit Demo ⬇';
-            demoToggleBtn.className = 'demo-toggle-btn';
-
-            // Hide edit section
-            editDemoSection.className = 'edit-demo-section';
-            isEditDemoOpen = false;
-
-            // Disconnect from server
-            if (webIdeBridge) {
-                webIdeBridge.disconnect();
-                webIdeBridge = null;
-            }
-
-            // Reset status
+    }
+    async function openEditDemo() {
+        try {
+            logActivity('Opening edit demo...', 'info');
+            $('#demoToggleBtn').text('Close Edit Demo ⬆').addClass('close');
+            $('#editDemoSection').addClass('show');
+            isEditDemoOpen = true;
+            const wsUrl = wsUrlInput.value.trim();
+            const user = userInput.value.trim() || 'peter';
+            const reconnectTime = parseInt(reconnectTimeInput.value) || 10000;
+            const connectionId = generatePersistentConnectionId();
+            logActivity(`Using user: ${user}`, 'info');
+            logActivity(`Using persistent connection ID: ${connectionId}`, 'info');
+            logActivity(`Connecting to: ${wsUrl}`, 'info');
+            updateSessionStatus('active', `User: ${user}, Reconnect: ${reconnectTime}ms`);
+            webIdeBridge = new WebIdeBridge(user, {
+                serverUrl: wsUrl,
+                reconnectInterval: reconnectTime,
+                autoReconnect: true,
+                debug: true,
+                connectionId: connectionId,
+                addButtons: false
+            });
+            webIdeBridge.onStatusChange((status) => {
+                isConnected = status.serverConnected;
+                updateBrowserServerStatus(status.serverConnected);
+                updateServerDesktopStatus(status.desktopConnected);
+                logActivity(`Browser-Server connection: ${status.serverConnected ? 'connected' : 'disconnected'}`, status.serverConnected ? 'success' : 'info');
+                logActivity(`Desktop connection: ${status.desktopConnected ? 'connected' : 'disconnected'}`, status.desktopConnected ? 'success' : 'info');
+            });
+            webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
+                const textarea = document.getElementById(snippetId);
+                if (textarea) {
+                    textarea.value = updatedCode;
+                    logActivity(`Code updated for ${snippetId}`, 'success');
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                // Send info message back to server on successful update
+                if (webIdeBridge && webIdeBridge.isConnected()) {
+                    webIdeBridge._sendMessage({
+                        type: 'info',
+                        connectionId: webIdeBridge.connectionId,
+                        userId: webIdeBridge.userId,
+                        payload: {
+                            snippetId,
+                            message: `Code has been updated in web editor field ${snippetId}`
+                        }
+                    });
+                }
+            });
+            webIdeBridge.onError((error) => {
+                logActivity(`Error: ${error}`, 'error');
+                updateSessionStatus('error', error);
+            });
             updateBrowserServerStatus(false);
-            updateServerDesktopStatus(false);
-            updateSessionStatus('ready', 'Click "Open Edit Demo" to start');
-
-            logActivity('Edit demo closed', 'info');
-        }
-
-        // Event listeners
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize persistent connection ID on page load
-            generatePersistentConnectionId();
-
-            // Initialize status
+            await webIdeBridge.connect();
+            logActivity('Successfully connected to Web-IDE-Bridge server!', 'success');
+        } catch (error) {
+            logActivity(`Failed to open edit demo: ${error.message}`, 'error');
             updateBrowserServerStatus(false);
-            updateServerDesktopStatus(false);
-            updateSessionStatus('ready', 'Click "Open Edit Demo" to start');
-
-            logActivity('Demo page loaded. Configure settings and click "Open Edit Demo"!', 'info');
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Ctrl+Shift+D / Cmd+Shift+D to toggle demo
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
-                e.preventDefault();
-                toggleEditDemo();
-            }
-
-            // Escape to close demo
-            if (e.key === 'Escape' && isEditDemoOpen) {
-                closeEditDemo();
-            }
-        });
-
-        // Page visibility change handling
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden && webIdeBridge && !isConnected && isEditDemoOpen) {
-                logActivity('Page became visible, attempting to reconnect...', 'info');
-                // WebIdeBridge will auto-reconnect due to autoReconnect: true
-            }
-        });
+            updateSessionStatus('error', error.message);
+            await closeEditDemo();
+        }
+    }
+    async function closeEditDemo() {
+        logActivity('Closing edit demo...', 'info');
+        $('#demoToggleBtn').text('Open Edit Demo ⬇').removeClass('close');
+        $('#editDemoSection').removeClass('show');
+        isEditDemoOpen = false;
+        if (webIdeBridge) {
+            webIdeBridge.disconnect();
+            webIdeBridge = null;
+        }
+        updateBrowserServerStatus(false);
+        updateServerDesktopStatus(false);
+        updateSessionStatus('ready', 'Click "Open Edit Demo" to start');
+        logActivity('Edit demo closed', 'info');
+    }
+    // jQuery handler for Edit in IDE buttons
+    $(document).on('click', '.edit-in-ide-btn', async function() {
+        if (!isConnected || !webIdeBridge) {
+            logActivity('Please open edit demo and connect first', 'error');
+            return;
+        }
+        const textareaId = $(this).data('textarea-id');
+        const fileType = $(this).data('file-type') || $('#' + textareaId).attr('data-type') || 'txt';
+        const textarea = document.getElementById(textareaId);
+        if (!textarea) {
+            logActivity(`Textarea ${textareaId} not found`, 'error');
+            return;
+        }
+        try {
+            const code = textarea.value;
+            logActivity(`Sending code to IDE: ${textareaId} (${fileType})`, 'info');
+            await webIdeBridge.editCodeSnippet(textareaId, code, fileType);
+            logActivity(`Code sent to IDE successfully`, 'success');
+        } catch (error) {
+            logActivity(`Failed to send code to IDE: ${error.message}`, 'error');
+        }
+    });
+    $(document).ready(function() {
+        generatePersistentConnectionId();
+        updateBrowserServerStatus(false);
+        updateServerDesktopStatus(false);
+        updateSessionStatus('ready', 'Click "Open Edit Demo" to start');
+        logActivity('jQuery demo page loaded. Configure settings and click "Open Edit Demo"!', 'info');
+    });
     </script>
 </body>
 </html>
