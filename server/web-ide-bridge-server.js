@@ -962,6 +962,7 @@ class WebIdeBridgeServer {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web-IDE-Bridge Server Status</title>
+    <link rel="icon" type="image/x-icon" href="/web-ide-bridge/assets/favicon.ico">
     <style>
         * {
             margin: 0;
