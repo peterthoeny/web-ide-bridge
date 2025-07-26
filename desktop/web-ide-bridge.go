@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -39,6 +38,12 @@ import (
 //go:embed web-ide-bridge.conf
 var _ embed.FS // keep linter from removing
 var embeddedConfig []byte
+
+//go:embed build/*
+var iconFS embed.FS
+
+//go:embed build/web-ide-bridge-24.png
+var icon24 []byte
 
 // ----------------------
 // Persistent Config
@@ -133,7 +138,7 @@ func loadConfig() (Config, error) {
 		_ = saveConfig(cfg)
 		return cfg, nil
 	}
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return Config{}, err
 	}
@@ -152,7 +157,7 @@ func saveConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path, data, 0600)
+	return os.WriteFile(path, data, 0600)
 }
 
 // UUID v4 generator (simple, not cryptographically secure)
@@ -586,6 +591,40 @@ func sectionHeader(title string) fyne.CanvasObject {
 }
 
 // ----------------------
+// App Icon Setup
+// ----------------------
+
+// setupAppIcon sets the appropriate icon for the current platform
+func setupAppIcon(a fyne.App) {
+	var iconName string
+
+	// Use PNG format for all platforms since Fyne supports it natively
+	// .icns and .ico files are not directly supported by Go's image package
+	switch runtime.GOOS {
+	case "darwin":
+		iconName = "web-ide-bridge.png" // Use PNG instead of .icns
+	case "windows":
+		iconName = "web-ide-bridge.png" // Use PNG instead of .ico
+	default: // linux and others
+		iconName = "web-ide-bridge.png"
+	}
+
+	// Try to load icon from embedded filesystem
+	iconData, err := iconFS.ReadFile("build/" + iconName)
+	if err != nil {
+		log.Printf("Warning: Could not load embedded icon %s: %v", iconName, err)
+		return
+	}
+
+	// Create a resource from the embedded icon data
+	iconResource := fyne.NewStaticResource(iconName, iconData)
+
+	// Set the app icon
+	a.SetIcon(iconResource)
+	log.Printf("Set app icon: %s", iconName)
+}
+
+// ----------------------
 // Main
 // ----------------------
 
@@ -593,6 +632,10 @@ func main() {
 	cfg, _ := loadConfig()
 
 	a := app.New()
+
+	// Set up platform-specific app icon
+	setupAppIcon(a)
+
 	w := a.NewWindow("Web-IDE-Bridge")
 	w.Resize(fyne.NewSize(700, 720)) // wider window
 
@@ -631,12 +674,15 @@ func main() {
 	go func() {
 		for {
 			tmpDir := os.TempDir()
-			files, err := ioutil.ReadDir(tmpDir)
+			files, err := os.ReadDir(tmpDir)
 			if err == nil {
 				now := time.Now()
 				for _, f := range files {
-					if strings.HasPrefix(f.Name(), "web-") && f.ModTime().Add(time.Duration(cleanupHours)*time.Hour).Before(now) {
-						os.Remove(filepath.Join(tmpDir, f.Name()))
+					if strings.HasPrefix(f.Name(), "web-") {
+						info, err := f.Info()
+						if err == nil && info.ModTime().Add(time.Duration(cleanupHours)*time.Hour).Before(now) {
+							os.Remove(filepath.Join(tmpDir, f.Name()))
+						}
 					}
 				}
 			}
@@ -742,11 +788,16 @@ func main() {
 				}
 			}
 			fileDialog := dialog.NewFileOpen(func(uc fyne.URIReadCloser, err error) {
-				if err == nil && uc != nil {
+				if err != nil {
+					appendLog("File dialog error: " + err.Error())
+					return
+				}
+				if uc != nil {
 					ideEntry.SetText(uc.URI().Path())
+					uc.Close()
 				}
 			}, w)
-			fileDialog.SetFilter(storage.NewExtensionFileFilter([]string{"", ".app"}))
+			// Don't set a filter - let the user see all files and folders
 			if startDir != "" {
 				if lister, err := storage.ListerForURI(storage.NewFileURI(startDir)); err == nil && lister != nil {
 					fileDialog.SetLocation(lister)
@@ -833,14 +884,21 @@ func main() {
 	editConfigBtn := widget.NewButton("Edit Configuration", showEditConfig)
 	editConfigBtn.Importance = widget.HighImportance
 
-	// Header with version badge
+	// Header with version badge and 24x24 icon
+	icon24Res := fyne.NewStaticResource("web-ide-bridge-24.png", icon24)
+	icon24Img := canvas.NewImageFromResource(icon24Res)
+	icon24Img.SetMinSize(fyne.NewSize(24, 24))
+	icon24Img.FillMode = canvas.ImageFillContain
 	title := canvas.NewText("Web-IDE-Bridge", color.RGBA{80, 80, 220, 255})
 	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.TextSize = 26
+	// Version badge with vertical adjustment
 	versionBadge := widget.NewLabel("v0.1.3")
 	versionBadge.TextStyle = fyne.TextStyle{Italic: true}
+
 	titleRow := container.NewHBox(
-		layout.NewSpacer(),
+		icon24Img,
+		canvas.NewText(" ", color.Transparent),
 		title,
 		canvas.NewText(" ", color.Transparent),
 		versionBadge,
@@ -864,7 +922,7 @@ func main() {
 	configCard := widget.NewCard("", "", configSection)
 
 	mainContent := container.NewVBox(
-		titleRow,
+		container.NewCenter(titleRow),
 		container.NewCenter(intro),
 		connStatusCard,
 		configCard,
