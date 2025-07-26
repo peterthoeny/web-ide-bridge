@@ -30,27 +30,18 @@ describe('Basic Server Functionality', () => {
       const client = createTestClient(serverPort);
       await client.connect();
       
-      // Wait for connection_init from server
-      await client.waitForMessage(msg => msg.type === 'connection_init', 3000);
-      
       const connectMessage = {
         type: 'browser_connect',
+        connectionId: client.connectionId,
         userId: 'test-user'
       };
       
       client.send(connectMessage);
       
-      // Check for error first to debug
-      const messages = await Promise.race([
-        client.waitForMessage(msg => msg.type === 'connection_ack', 5000),
-        client.waitForMessage(msg => msg.type === 'error', 5000).then(error => {
-          console.log('Received error:', error.payload.message);
-          throw new Error(`Expected connection_ack but got error: ${error.payload.message}`);
-        })
-      ]);
+      const response = await client.waitForMessage(msg => msg.type === 'connection_ack', 5000);
       
-      expect(messages.status).toBe('connected');
-      expect(messages.role).toBe('browser');
+      expect(response.status).toBe('connected');
+      expect(response.role).toBe('browser');
       
       await client.close();
     });
@@ -59,24 +50,15 @@ describe('Basic Server Functionality', () => {
       const client = createTestClient(serverPort);
       await client.connect();
       
-      // Wait for connection_init from server
-      await client.waitForMessage(msg => msg.type === 'connection_init', 3000);
-      
       const pingMessage = {
         type: 'ping',
+        connectionId: client.connectionId,
         payload: { test: 'data' }
       };
       
       client.send(pingMessage);
       
-      // Check for error first to debug
-      const response = await Promise.race([
-        client.waitForMessage(msg => msg.type === 'pong', 5000),
-        client.waitForMessage(msg => msg.type === 'error', 5000).then(error => {
-          console.log('Received error:', error.payload.message);
-          throw new Error(`Expected pong but got error: ${error.payload.message}`);
-        })
-      ]);
+      const response = await client.waitForMessage(msg => msg.type === 'pong', 5000);
       
       expect(response.payload.test).toBe('data');
       expect(response.timestamp).toBeDefined();
@@ -143,50 +125,57 @@ describe('Basic Server Functionality', () => {
       const client = createTestClient(serverPort);
       await client.connect();
       
+      // Send a message without type field (the test client won't auto-add it)
       const invalidMessage = {
+        connectionId: client.connectionId,
         userId: 'test-user'
-        // Missing type and connectionId will be auto-added
+        // Missing type field
       };
       
-      client.send(invalidMessage);
+      client.ws.send(JSON.stringify(invalidMessage));
       
       const error = await client.waitForMessage(msg => msg.type === 'error');
       expect(error.payload.message).toContain('Message must have a string type field');
       
       await client.close();
     });
-  });
 
-  describe('Debug Connection Issues', () => {
-    test('should debug browser connection errors', async () => {
+    test('should reject message without connectionId', async () => {
       const client = createTestClient(serverPort);
       await client.connect();
       
-      // Log the connectionId being used
-      console.log('Client connectionId:', client.connectionId);
+      // Send a message without connectionId field
+      const invalidMessage = {
+        type: 'browser_connect',
+        userId: 'test-user'
+        // Missing connectionId field
+      };
+      
+      client.ws.send(JSON.stringify(invalidMessage));
+      
+      const error = await client.waitForMessage(msg => msg.type === 'error');
+      expect(error.payload.message).toContain('Message must have a string connectionId field');
+      
+      await client.close();
+    });
+  });
+
+  describe('Debug Connection Issues', () => {
+    test('should handle browser connection with proper validation', async () => {
+      const client = createTestClient(serverPort);
+      await client.connect();
       
       const connectMessage = {
         type: 'browser_connect',
-        connectionId: client.connectionId, // Explicitly set
+        connectionId: client.connectionId,
         userId: 'debug-user'
       };
       
       client.send(connectMessage);
       
-      // Wait for any response and log it
-      const response = await client.waitForMessage(msg => true, 3000);
-      console.log('First response:', response);
-      
-      if (response.type === 'error') {
-        console.log('Error details:', response.payload);
-        
-        // Try to understand what connectionId the server expects
-        console.log('Server expected connectionId vs client connectionId');
-        
-        // Get all error messages for context
-        const allMessages = client.getMessages();
-        console.log('All messages received:', allMessages);
-      }
+      const response = await client.waitForMessage(msg => msg.type === 'connection_ack', 5000);
+      expect(response.status).toBe('connected');
+      expect(response.role).toBe('browser');
       
       await client.close();
     });

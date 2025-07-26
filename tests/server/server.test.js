@@ -7,11 +7,7 @@ describe('WebIdeBridgeServer Core', () => {
   let serverPort;
 
   beforeEach(async () => {
-    server = new WebIdeBridgeServer();
-    
-    // Override config for testing
-    server.config = global.testUtils.createTestConfig();
-    
+    server = await global.testUtils.createTestServer();
     await server.start();
     serverPort = server.server.address().port;
     
@@ -20,9 +16,7 @@ describe('WebIdeBridgeServer Core', () => {
   });
 
   afterEach(async () => {
-    if (server && server.server) {
-      await server.shutdown();
-    }
+    await global.testUtils.cleanupTestServer(server);
   });
 
   describe('Server Initialization', () => {
