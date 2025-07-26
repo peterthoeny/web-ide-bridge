@@ -1824,7 +1824,7 @@ function main() {
       case '--help':
       case '-h':
         console.log(`
-Web-IDE-Bridge Server v0.1.3
+Web-IDE-Bridge Server v${VERSION}
 
 Usage: web-ide-bridge-server [options]
 

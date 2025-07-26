@@ -17,7 +17,7 @@ build_for_platform() {
     echo ""
     echo "🔨 Building for $platform_name ($os_$arch)..."
     
-    if (cd desktop && GOOS=$os GOARCH=$arch go build -o ../bin/${os}_${arch}/$output_name web-ide-bridge.go 2>/dev/null); then
+    if (cd desktop && GOOS=$os GOARCH=$arch go build -ldflags "-X main.Version=$(node -p "require('../package.json').version")" -o ../bin/${os}_${arch}/$output_name web-ide-bridge.go 2>/dev/null); then
         echo "✅ Successfully built for $platform_name"
     else
         echo "⚠️  Build failed for $platform_name (cross-compilation constraints)"

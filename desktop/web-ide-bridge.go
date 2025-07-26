@@ -35,6 +35,54 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Version variables that can be set via build flags
+var (
+	Version = "dev" // Default version, can be overridden at build time
+)
+
+// getVersion returns the version string, trying multiple sources
+func getVersion() string {
+	// If version was set via build flags, use it
+	if Version != "dev" {
+		return Version
+	}
+
+	// Try to read from package.json in the project root
+	if version := readVersionFromPackageJSON(); version != "" {
+		return version
+	}
+
+	// Fallback to default
+	return "dev"
+}
+
+// readVersionFromPackageJSON reads version from the root package.json
+func readVersionFromPackageJSON() string {
+	// Try to find package.json in the project root (relative to desktop directory)
+	packageJSONPath := filepath.Join("..", "package.json")
+
+	// If we're running from desktop directory, go up one level
+	if _, err := os.Stat(packageJSONPath); os.IsNotExist(err) {
+		// Try current directory (if running from project root)
+		packageJSONPath = "package.json"
+	}
+
+	data, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return ""
+	}
+
+	var pkg struct {
+		Version string `json:"version"`
+	}
+
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return ""
+	}
+
+	return pkg.Version
+}
+
 //go:embed web-ide-bridge.conf
 var _ embed.FS // keep linter from removing
 var embeddedConfig []byte
@@ -893,7 +941,7 @@ func main() {
 	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.TextSize = 26
 	// Version badge with vertical adjustment
-	versionBadge := widget.NewLabel("v" + VERSION)
+	versionBadge := widget.NewLabel("v" + getVersion())
 	versionBadge.TextStyle = fyne.TextStyle{Italic: true}
 
 	titleRow := container.NewHBox(

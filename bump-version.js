@@ -35,12 +35,7 @@ const filesToUpdate = [
       { from: /const VERSION = '[\d.]+'/, to: `const VERSION = '${newVersion}'` }
     ]
   },
-  {
-    file: 'desktop/version.go',
-    patterns: [
-      { from: /const VERSION = "[\d.]+"/, to: `const VERSION = "${newVersion}"` }
-    ]
-  },
+
   {
     file: 'package.json',
     patterns: [

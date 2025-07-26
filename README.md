@@ -290,11 +290,15 @@ go run web-ide-bridge.go
 
 # Or build for your current platform only
 cd desktop
-go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
+go build -ldflags "-X main.Version=$(node -p "require('../package.json').version")" -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
+
+# Or run directly (development)
+cd desktop
+go run web-ide-bridge.go
 
 # Or build for a specific platform
 cd desktop
-GOOS=darwin GOARCH=amd64 go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
+GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=$(node -p "require('../package.json').version")" -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
 
 # The app will automatically use platform-specific icons from the assets/ directory
 ```
@@ -321,7 +325,7 @@ Web-IDE-Bridge uses a centralized version management system:
 
 **📁 Version Files:**
 - `version.js` - JavaScript version configuration (used by server and browser)
-- `desktop/version.go` - Go version constant (used by desktop app)
+- `package.json` - Root version (used by desktop app via build flags)
 
 **🚀 Bumping Versions:**
 ```bash
