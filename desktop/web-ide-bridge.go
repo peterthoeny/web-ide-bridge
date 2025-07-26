@@ -39,10 +39,10 @@ import (
 var _ embed.FS // keep linter from removing
 var embeddedConfig []byte
 
-//go:embed build/*
+//go:embed assets/*
 var iconFS embed.FS
 
-//go:embed build/web-ide-bridge-24.png
+//go:embed assets/web-ide-bridge-24.png
 var icon24 []byte
 
 // ----------------------
@@ -610,7 +610,7 @@ func setupAppIcon(a fyne.App) {
 	}
 
 	// Try to load icon from embedded filesystem
-	iconData, err := iconFS.ReadFile("build/" + iconName)
+	iconData, err := iconFS.ReadFile("assets/" + iconName)
 	if err != nil {
 		log.Printf("Warning: Could not load embedded icon %s: %v", iconName, err)
 		return

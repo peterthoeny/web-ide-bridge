@@ -44,8 +44,8 @@ web-ide-bridge/
 │   ├── package.json                    # Browser package configuration
 │   ├── webpack.config.js               # Build configuration
 │   ├── assets/                         # Demo assets
-│   │   ├── web-ide-bridge-24.png          # 24x24 icon for demo pages
-│   │   └── favicon.ico                   # Favicon for demo pages
+│   │   ├── web-ide-bridge-24.png       # 24x24 icon for demo pages
+│   │   └── favicon.ico                 # Favicon for demo pages
 │   └── src/
 │       ├── client.js                   # Main client implementation
 │       ├── ui.js                       # UI components and styling
@@ -55,12 +55,12 @@ web-ide-bridge/
 │   ├── go.mod                          # Go module definition
 │   ├── go.sum                          # Go module checksums
 │   ├── web-ide-bridge.conf             # Desktop app/org config (JSON)
-│   └── build/                          # App icons and assets
-│       ├── web-ide-bridge.png             # App icon (PNG format)
-│       ├── web-ide-bridge-24.png          # 24x24 icon for UI
-│       ├── web-ide-bridge.icns            # macOS app icon
-│       ├── web-ide-bridge.ico             # Windows app icon
-│       └── favicon.ico                   # Favicon
+│   └── assets/                         # App icons and assets
+│       ├── web-ide-bridge.png              # App icon (PNG format)
+│       ├── web-ide-bridge-24.png           # 24x24 icon for UI
+│       ├── web-ide-bridge.icns             # macOS app icon
+│       ├── web-ide-bridge.ico              # Windows app icon
+│       └── favicon.ico                     # Favicon
 ├── server/                         # Server component
 │   ├── README.md                       # Server-specific notes
 │   ├── package.json                    # Node.js package configuration
@@ -68,8 +68,8 @@ web-ide-bridge/
 │   ├── web-ide-bridge-server.conf      # Server configuration file (JSON)
 │   ├── web-ide-bridge-server.js        # Node.js WebSocket server
 │   └── assets/                         # Server assets
-│       ├── web-ide-bridge-24.png          # 24x24 icon for status page
-│       └── favicon.ico                   # Favicon for status page
+│       ├── web-ide-bridge-24.png           # 24x24 icon for status page
+│       └── favicon.ico                     # Favicon for status page
 └── tests/                          # Test infrastructure
     ├── setup.js                        # Global test configuration
     ├── browser/                        # Browser library tests
@@ -80,15 +80,15 @@ web-ide-bridge/
     │   └── built-library.test.js           # Tests for built UMD library
     ├── desktop/                        # Desktop app tests
     ├── e2e/                            # End-to-end tests
-    │   └── full-workflow.test.js       # Complete user workflows
+    │   └── full-workflow.test.js           # Complete user workflows
     ├── server/                         # Server-specific tests
-    │   ├── basic.test.js               # Basic server tests
-    │   ├── edge-cases.test.js          # Error handling and edge cases
-    │   ├── performance.test.js         # Load and performance testing
-    │   ├── server.test.js              # Core server functionality
-    │   └── validation.test.js          # Validation logic tests
-    └── utils/
-        └── websocket-utils.js          # WebSocket testing helpers
+    │   ├── basic.test.js                   # Basic server tests
+    │   ├── edge-cases.test.js              # Error handling and edge cases
+    │   ├── performance.test.js             # Load and performance testing
+    │   ├── server.test.js                  # Core server functionality
+    │   └── validation.test.js              # Validation logic tests
+    └── utils/                          # Utilities used by tests
+        └── websocket-utils.js              # WebSocket testing helpers
 ```
 
 ## Architecture
@@ -216,7 +216,7 @@ cd desktop
 # Build a binary for your platform
 go build -o web-ide-bridge web-ide-bridge.go
 
-# The app will automatically use platform-specific icons from the build/ directory
+# The app will automatically use platform-specific icons from the assets/ directory
 ```
 
 **Features:**
