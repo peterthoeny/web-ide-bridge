@@ -34,9 +34,16 @@ class WebIdeBridgeServer {
     // Rate limiting store
     this.rateLimitStore = new Map();
 
+    // Activity log
+    this.activityLog = [];
+    this.maxActivityLogEntries = 100;
+
     // Cleanup intervals
     this.cleanupInterval = null;
     this.heartbeatInterval = null;
+
+    // Shutdown state tracking
+    this.isShuttingDown = false;
 
     // Process event handlers (store references for cleanup)
     this.processHandlers = {
@@ -360,6 +367,11 @@ class WebIdeBridgeServer {
             console.log(`WebSocket endpoint: ${this.wsOptions.path}`);
             console.log(`Environment: ${this.config.environment}`);
             console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
+
+            // Add to activity log
+            this.addActivityLogEntry(`Server started on ${this.config.server.host}:${this.config.server.port}`, 'success');
+            this.addActivityLogEntry(`WebSocket endpoint: ${this.wsOptions.path}`, 'info');
+            this.addActivityLogEntry(`Environment: ${this.config.environment}`, 'info');
           }
 
           resolve();
@@ -516,6 +528,14 @@ class WebIdeBridgeServer {
         clearTimeout(connectionTimeout);
 
         const message = JSON.parse(data);
+
+        // Validate message before processing
+        const validation = this.validateMessage(message);
+        if (!validation.valid) {
+          this.sendError(ws, validation.error);
+          return;
+        }
+
         // Inline message routing logic
         switch (message.type) {
           case 'browser_connect':
@@ -604,6 +624,9 @@ class WebIdeBridgeServer {
     this.sendDesktopStatusToBrowser(userId);
     this.sendBrowserStatusToDesktop(userId);
 
+    // Add to activity log
+    this.addActivityLogEntry(`Browser connected: ${userId} (${ws.connectionId})`, 'success');
+
     if (this.config.debug) {
       console.log(`Browser connected: userId=${userId}, connectionId=${ws.connectionId}`);
     }
@@ -646,6 +669,9 @@ class WebIdeBridgeServer {
 
     this.sendBrowserStatusToDesktop(userId);
     this.sendDesktopStatusToBrowser(userId);
+
+    // Add to activity log
+    this.addActivityLogEntry(`Desktop connected: ${userId} (${ws.connectionId})`, 'success');
 
     if (this.config.debug) {
       console.log(`Desktop connected: userId=${userId}, connectionId=${ws.connectionId}`);
@@ -693,6 +719,9 @@ class WebIdeBridgeServer {
       type: 'edit_request',
       payload
     });
+
+    // Add to activity log
+    this.addActivityLogEntry(`Edit request: ${userId} → ${payload.snippetId}`, 'info');
 
     if (this.config.debug) {
       console.log(`Edit request: userId=${userId}, snippetId=${payload.snippetId}`);
@@ -766,6 +795,9 @@ class WebIdeBridgeServer {
       }
     });
 
+    // Add to activity log
+    this.addActivityLogEntry(`Code update: ${userId} ← ${session.snippetId}`, 'info');
+
     if (this.config.debug) {
       console.log(`Code update: userId=${userId}, snippetId=${session.snippetId}`);
     }
@@ -825,6 +857,9 @@ class WebIdeBridgeServer {
         }
       }
       this.sendBrowserStatusToDesktop(browserConn.userId);
+
+      // Add to activity log
+      this.addActivityLogEntry(`Browser disconnected: ${browserConn.userId} (${ws.connectionId})`, 'warning');
     }
 
     // Remove from desktop connections
@@ -841,6 +876,9 @@ class WebIdeBridgeServer {
         }
       }
       this.sendDesktopStatusToBrowser(desktopConn.userId);
+
+      // Add to activity log
+      this.addActivityLogEntry(`Desktop disconnected: ${desktopConn.userId} (${ws.connectionId})`, 'warning');
     }
 
     // Clean up active sessions associated with this connection
@@ -881,6 +919,9 @@ class WebIdeBridgeServer {
       console.error(`Error: ${message} (connection: ${ws.connectionId})`);
     }
 
+    // Add to activity log
+    this.addActivityLogEntry(`Error: ${message} (${ws.connectionId})`, 'error');
+
     this.sendMessage(ws, {
       type: 'error',
       payload: { message, code }
@@ -911,6 +952,9 @@ class WebIdeBridgeServer {
 
     const statusColor = connectionStatus === 'active' ? '#10b981' : '#f59e0b';
 
+    // Get activity log entries
+    const activityLogEntries = this.getActivityLogEntries(15);
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -940,7 +984,7 @@ class WebIdeBridgeServer {
             border-radius: 16px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             padding: 2rem;
-            max-width: 800px;
+            max-width: 1200px;
             width: 90%;
             margin: 2rem;
         }
@@ -952,16 +996,35 @@ class WebIdeBridgeServer {
             padding-bottom: 1.5rem;
         }
 
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header-icon {
+            width: 24px;
+            height: 24px;
+        }
+
         .title {
             font-size: 2rem;
             font-weight: 700;
             color: #1f2937;
-            margin-bottom: 0.5rem;
+        }
+
+        .version {
+            color: #6b7280;
+            font-size: 0.875rem;
+            font-weight: 500;
         }
 
         .subtitle {
             color: #6b7280;
             font-size: 1rem;
+            margin-bottom: 1rem;
         }
 
         .status-badge {
@@ -979,7 +1042,7 @@ class WebIdeBridgeServer {
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -1035,6 +1098,65 @@ class WebIdeBridgeServer {
             font-size: 0.875rem;
         }
 
+        .activity-log {
+            grid-column: 1 / -1;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-log .card-content {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 8px;
+            margin-bottom: 0.25rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        .log-entry:last-child {
+            margin-bottom: 0;
+        }
+
+        .log-entry.info {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .log-entry.success {
+            background: #f0fdf4;
+            border-left: 4px solid #10b981;
+        }
+
+        .log-entry.warning {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .log-entry.error {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+        }
+
+        .log-time {
+            color: #6b7280;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            min-width: 60px;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
         .footer {
             text-align: center;
             margin-top: 2rem;
@@ -1054,15 +1176,6 @@ class WebIdeBridgeServer {
             text-decoration: underline;
         }
 
-        .version {
-            background: #4f46e5;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
         @media (max-width: 640px) {
             .container {
                 margin: 1rem;
@@ -1076,15 +1189,27 @@ class WebIdeBridgeServer {
             .grid {
                 grid-template-columns: 1fr;
             }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header-content {
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">Web-IDE-Bridge Server</h1>
+            <div class="title-row">
+                <img src="/web-ide-bridge/assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
+                <h1 class="title">Web-IDE-Bridge Server</h1>
+                <div class="version">v0.1.3</div>
+            </div>
             <p class="subtitle">WebSocket relay server for seamless IDE integration</p>
-            <span class="version">v0.1.3</span>
             <div class="status-badge">${connectionStatus}</div>
         </div>
 
@@ -1172,6 +1297,21 @@ class WebIdeBridgeServer {
                     </div>
                 </div>
             </div>
+
+            <div class="card activity-log">
+                <h2 class="card-title">📋 Activity Log</h2>
+                <div class="card-content">
+                    ${activityLogEntries.length > 0 ? 
+                        activityLogEntries.map(entry => `
+                            <div class="log-entry ${entry.type}">
+                                <span class="log-time">${entry.time}</span>
+                                <span class="log-message">${entry.message}</span>
+                            </div>
+                        `).join('') : 
+                        '<div class="log-entry info"><span class="log-message">No activity yet</span></div>'
+                    }
+                </div>
+            </div>
         </div>
 
         <div class="footer">
@@ -1220,6 +1360,9 @@ class WebIdeBridgeServer {
    * Set up HTTP routes
    */
   setupRoutes() {
+    // Serve static assets
+    this.app.use('/web-ide-bridge/assets', express.static(path.join(__dirname, 'assets')));
+
     // Redirect root to status page
     this.app.get('/', (req, res) => {
       res.redirect(this.config.endpoints?.status || '/web-ide-bridge/status');
@@ -1297,6 +1440,7 @@ class WebIdeBridgeServer {
             createdAt: new Date(session.createdAt).toISOString(),
             lastActivity: new Date(session.lastActivity).toISOString()
           })),
+          activityLog: this.getActivityLogEntries(50),
           config: this.config,
           process: {
             uptime: process.uptime(),
@@ -1386,6 +1530,7 @@ class WebIdeBridgeServer {
 
     if (cleanedCount > 0 && this.config.debug) {
       console.log(`Cleaned up ${cleanedCount} expired sessions`);
+      this.addActivityLogEntry(`Cleaned up ${cleanedCount} expired sessions`, 'info');
     }
   }
 
@@ -1409,6 +1554,7 @@ class WebIdeBridgeServer {
 
     if (cleanedCount > 0 && this.config.debug) {
       console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
+      this.addActivityLogEntry(`Cleaned up ${cleanedCount} expired rate limit entries`, 'info');
     }
   }
 
@@ -1421,13 +1567,13 @@ class WebIdeBridgeServer {
       return;
     }
 
+    // Remove existing handlers first to prevent duplicates
+    this.removeProcessHandlers();
+
     const shutdown = (signal) => {
       console.log(`Received ${signal}, shutting down gracefully...`);
       this.shutdown();
     };
-
-    // Remove existing handlers if they exist
-    this.removeProcessHandlers();
 
     // Set up new handlers and store references
     this.processHandlers.SIGTERM = () => shutdown('SIGTERM');
@@ -1441,6 +1587,7 @@ class WebIdeBridgeServer {
       this.shutdown();
     };
 
+    // Register handlers
     process.on('SIGTERM', this.processHandlers.SIGTERM);
     process.on('SIGINT', this.processHandlers.SIGINT);
     process.on('uncaughtException', this.processHandlers.uncaughtException);
@@ -1469,8 +1616,15 @@ class WebIdeBridgeServer {
    * Shutdown server gracefully
    */
   async shutdown() {
+    if (this.isShuttingDown) {
+      console.log('Server is already in the process of shutting down.');
+      return;
+    }
+
+    this.isShuttingDown = true;
     try {
       console.log('Starting server shutdown...');
+      this.addActivityLogEntry('Server shutdown initiated', 'warning');
 
       // Clear all intervals first
       if (this.cleanupInterval) {
@@ -1488,6 +1642,7 @@ class WebIdeBridgeServer {
       // Close all WebSocket connections with proper cleanup
       if (this.wss && this.wss.clients) {
         console.log(`Closing ${this.wss.clients.size} WebSocket connections...`);
+        this.addActivityLogEntry(`Closing ${this.wss.clients.size} WebSocket connections`, 'info');
         const closePromises = [];
 
         this.wss.clients.forEach((ws) => {
@@ -1508,37 +1663,46 @@ class WebIdeBridgeServer {
 
         await Promise.all(closePromises);
         console.log('All WebSocket connections closed');
+        this.addActivityLogEntry('All WebSocket connections closed', 'info');
       }
 
       // Close WebSocket server
       if (this.wss) {
-        await new Promise((resolve, reject) => {
-          this.wss.close((error) => {
-            if (error) {
-              console.error('Error closing WebSocket server:', error);
-              reject(error);
-            } else {
-              console.log('WebSocket server closed');
-              resolve();
-            }
+        try {
+          await new Promise((resolve, reject) => {
+            this.wss.close((error) => {
+              if (error) {
+                console.error('Error closing WebSocket server:', error);
+                reject(error);
+              } else {
+                console.log('WebSocket server closed');
+                resolve();
+              }
+            });
           });
-        });
+        } catch (error) {
+          console.log('WebSocket server already closed or error during close:', error.message);
+        }
         this.wss = null;
       }
 
       // Close HTTP server
       if (this.server) {
-        await new Promise((resolve, reject) => {
-          this.server.close((error) => {
-            if (error) {
-              console.error('Error closing HTTP server:', error);
-              reject(error);
-            } else {
-              console.log('HTTP server closed');
-              resolve();
-            }
+        try {
+          await new Promise((resolve, reject) => {
+            this.server.close((error) => {
+              if (error) {
+                console.error('Error closing HTTP server:', error);
+                reject(error);
+              } else {
+                console.log('HTTP server closed');
+                resolve();
+              }
+            });
           });
-        });
+        } catch (error) {
+          console.log('HTTP server already closed or error during close:', error.message);
+        }
         this.server = null;
       }
 
@@ -1563,13 +1727,15 @@ class WebIdeBridgeServer {
       this.removeProcessHandlers();
 
       console.log('Server shutdown complete');
+      this.addActivityLogEntry('Server shutdown complete', 'success');
 
       // Give a moment for everything to settle
       await new Promise(resolve => setTimeout(resolve, 100));
 
     } catch (error) {
       console.error('Error during shutdown:', error);
-      throw error;
+      this.addActivityLogEntry(`Shutdown error: ${error.message}`, 'error');
+      // Don't re-throw the error to prevent uncaught exception
     }
   }
 
@@ -1594,6 +1760,42 @@ class WebIdeBridgeServer {
       type: 'status_update',
       browserConnected
     });
+  }
+
+  /**
+   * Add entry to activity log
+   */
+  addActivityLogEntry(message, type = 'info') {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      message,
+      type // 'info', 'success', 'warning', 'error'
+    };
+
+    this.activityLog.unshift(entry); // Add to beginning
+
+    // Keep only the latest entries
+    if (this.activityLog.length > this.maxActivityLogEntries) {
+      this.activityLog = this.activityLog.slice(0, this.maxActivityLogEntries);
+    }
+  }
+
+  /**
+   * Get formatted activity log entries
+   */
+  getActivityLogEntries(limit = 20) {
+    return this.activityLog.slice(0, limit).map(entry => ({
+      ...entry,
+      time: new Date(entry.timestamp).toLocaleTimeString(),
+      date: new Date(entry.timestamp).toLocaleDateString()
+    }));
+  }
+
+  /**
+   * Clear activity log
+   */
+  clearActivityLog() {
+    this.activityLog = [];
   }
 }
 
