@@ -893,7 +893,7 @@ func main() {
 	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.TextSize = 26
 	// Version badge with vertical adjustment
-	versionBadge := widget.NewLabel("v0.1.3")
+	versionBadge := widget.NewLabel("v" + VERSION)
 	versionBadge.TextStyle = fyne.TextStyle{Italic: true}
 
 	titleRow := container.NewHBox(

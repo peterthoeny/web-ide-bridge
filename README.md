@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v0.1.3
+# Web-IDE-Bridge v1.0.0
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-0.1.3-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -38,6 +38,8 @@ web-ide-bridge/
 ├── .babelrc                        # Babel configuration
 ├── .gitignore                      # Git ignore patterns
 ├── build.sh                        # Cross-platform build script
+├── version.js                      # Centralized version configuration
+├── bump-version.js                 # Version bump automation script
 ├── developer_context.md            # Technical implementation guide (advanced)
 ├── browser/                        # Browser component
 │   ├── demo.html                       # Demo page with textarea forms
@@ -288,13 +290,57 @@ go run web-ide-bridge.go
 
 # Or build for your current platform only
 cd desktop
-go build -o web-ide-bridge web-ide-bridge.go
+go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
 
 # Or build for a specific platform
 cd desktop
 GOOS=darwin GOARCH=amd64 go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
 
 # The app will automatically use platform-specific icons from the assets/ directory
+```
+
+**Build Outputs:**
+- `bin/darwin_amd64/web-ide-bridge` - macOS Intel (✅ builds successfully)
+- `bin/darwin_arm64/web-ide-bridge` - macOS Apple Silicon (⚠️ cross-compilation constraints)
+- `bin/linux_amd64/web-ide-bridge` - Linux Intel/AMD (⚠️ cross-compilation constraints)
+- `bin/windows_amd64/web-ide-bridge.exe` - Windows Intel/AMD (⚠️ cross-compilation constraints)
+
+**Note:** GUI applications with native dependencies (like Fyne) have cross-compilation constraints. The build script will attempt all platforms but may only succeed for the current platform.
+
+**Distribution:**
+```bash
+# Create platform-specific release packages
+zip -r web-ide-bridge-darwin-amd64.zip bin/darwin_amd64/
+zip -r web-ide-bridge-linux-amd64.zip bin/linux_amd64/
+zip -r web-ide-bridge-windows-amd64.zip bin/windows_amd64/
+```
+
+### Version Management
+
+Web-IDE-Bridge uses a centralized version management system:
+
+**📁 Version Files:**
+- `version.js` - JavaScript version configuration (used by server and browser)
+- `desktop/version.go` - Go version constant (used by desktop app)
+
+**🚀 Bumping Versions:**
+```bash
+# Bump to a new version (updates all files automatically)
+node bump-version.js 1.0.1
+
+# Manual version updates (if needed)
+# 1. Update version.js
+# 2. Update desktop/version.go
+# 3. Update package.json files
+# 4. Update documentation files
+```
+
+**✅ Files Automatically Updated:**
+- All package.json files
+- Documentation (README.md, developer_context.md)
+- Source files (server, browser, desktop)
+- Test files
+- Demo HTML files
 ```
 
 **Build Outputs:**

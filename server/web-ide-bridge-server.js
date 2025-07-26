@@ -10,6 +10,7 @@ const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const { VERSION } = require('../version.js');
 
 /**
  * Web-IDE-Bridge Server
@@ -363,7 +364,7 @@ class WebIdeBridgeServer {
 
           // Only log if not in test environment
           if (process.env.NODE_ENV !== 'test') {
-            console.log(`Web-IDE-Bridge server v0.1.3 running on ${this.config.server.host}:${this.config.server.port}`);
+            console.log(`Web-IDE-Bridge server v${VERSION} running on ${this.config.server.host}:${this.config.server.port}`);
             console.log(`WebSocket endpoint: ${this.wsOptions.path}`);
             console.log(`Environment: ${this.config.environment}`);
             console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
@@ -1208,7 +1209,7 @@ class WebIdeBridgeServer {
             <div class="title-row">
                 <img src="/web-ide-bridge/assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
                 <h1 class="title">Web-IDE-Bridge Server</h1>
-                <div class="version">v0.1.3</div>
+                <div class="version">v${VERSION}</div>
             </div>
             <p class="subtitle">WebSocket relay server for seamless IDE integration</p>
             <div class="status-badge">${connectionStatus}</div>
@@ -1373,7 +1374,7 @@ class WebIdeBridgeServer {
     this.app.get(this.config.endpoints?.health || '/web-ide-bridge/health', (req, res) => {
       res.json({
         status: 'healthy',
-        version: '0.1.3',
+        version: VERSION,
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
       });
@@ -1389,7 +1390,7 @@ class WebIdeBridgeServer {
         // Return JSON for API calls and tests
         res.json({
           active: true,
-          version: '0.1.3',
+          version: VERSION,
           uptime: process.uptime(),
           connections: {
             browser: this.browserConnections.size,
