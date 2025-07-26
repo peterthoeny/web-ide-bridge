@@ -43,6 +43,9 @@ web-ide-bridge/
 │   ├── web-ide-bridge.min.js.map       # Source map for minified version
 │   ├── package.json                    # Browser package configuration
 │   ├── webpack.config.js               # Build configuration
+│   ├── assets/                         # Demo assets
+│   │   ├── web-ide-bridge-24.png          # 24x24 icon for demo pages
+│   │   └── favicon.ico                   # Favicon for demo pages
 │   └── src/
 │       ├── client.js                   # Main client implementation
 │       ├── ui.js                       # UI components and styling
@@ -51,16 +54,30 @@ web-ide-bridge/
 │   ├── web-ide-bridge.go               # Main Go application (desktop app)
 │   ├── go.mod                          # Go module definition
 │   ├── go.sum                          # Go module checksums
-│   └── web-ide-bridge.conf             # Desktop app/org config (JSON)
+│   ├── web-ide-bridge.conf             # Desktop app/org config (JSON)
+│   └── build/                          # App icons and assets
+│       ├── web-ide-bridge.png             # App icon (PNG format)
+│       ├── web-ide-bridge-24.png          # 24x24 icon for UI
+│       ├── web-ide-bridge.icns            # macOS app icon
+│       ├── web-ide-bridge.ico             # Windows app icon
+│       └── favicon.ico                   # Favicon
 ├── server/                         # Server component
 │   ├── README.md                       # Server-specific notes
 │   ├── package.json                    # Node.js package configuration
 │   ├── package-lock.json               # Locked dependencies
 │   ├── web-ide-bridge-server.conf      # Server configuration file (JSON)
-│   └── web-ide-bridge-server.js        # Node.js WebSocket server
+│   ├── web-ide-bridge-server.js        # Node.js WebSocket server
+│   └── assets/                         # Server assets
+│       ├── web-ide-bridge-24.png          # 24x24 icon for status page
+│       └── favicon.ico                   # Favicon for status page
 └── tests/                          # Test infrastructure
     ├── setup.js                        # Global test configuration
     ├── browser/                        # Browser library tests
+    │   ├── utils.test.js                   # Unit tests for browser utils
+    │   ├── ui.test.js                      # Unit tests for browser UI
+    │   ├── client.test.js                  # Unit tests for browser client
+    │   ├── simple.test.js                  # Basic Jest sanity check
+    │   └── built-library.test.js           # Tests for built UMD library
     ├── desktop/                        # Desktop app tests
     ├── e2e/                            # End-to-end tests
     │   └── full-workflow.test.js       # Complete user workflows
@@ -120,10 +137,9 @@ npm install
 cd ..
 
 # Install desktop dependencies
-# (Optional) Download Go dependencies
 cd desktop
 go mod tidy
-# Go will fetch dependencies automatically when you run or build the app
+cd ..
 ```
 
 ### 2. Start the Server
@@ -143,7 +159,7 @@ npm start -- --port 8071
 npm start -- --config /path/to/config.conf
 ```
 
-**Server Status:** Visit [http://localhost:8071](http://localhost:8071) to see the beautiful status dashboard.
+**Server Status:** Visit [http://localhost:8071](http://localhost:8071) to see the beautiful status dashboard with real-time activity log.
 
 ### 3. Run Tests
 
@@ -157,28 +173,20 @@ npm install  # Install test dependencies
 npm test
 
 # Run specific test suites
-npm run test:server         # Server functionality tests
-npm run test:browser        # Browser library tests
-npm run test:desktop        # Desktop app tests
-npm run test:e2e           # End-to-end integration tests
-
-# Performance and load testing
-npm run test:performance   # Performance benchmarks
-npm run test:edge-cases    # Error handling and edge cases
-
-# Test reporting
-npm run test:coverage      # Generate coverage report
-npm run test:ci           # CI-friendly test run
-
-# Development testing
-npm run test:watch        # Watch mode for development
+npm test -- tests/server/         # Server functionality tests
+npm test -- tests/browser/        # Browser library tests
+npm test -- tests/e2e/           # End-to-end integration tests
 
 # Run specific test files
 npm test -- tests/server/server.test.js
+npm test -- tests/browser/built-library.test.js
 npm test -- tests/e2e/full-workflow.test.js
 
 # Debug test runs
 DEBUG_TESTS=true npm test
+
+# Test with coverage
+npm test -- --coverage
 ```
 
 **Test Coverage Areas:**
@@ -187,33 +195,57 @@ DEBUG_TESTS=true npm test
 - ✅ **Performance Tests:** Load testing, memory usage, response times
 - ✅ **Edge Cases:** Error handling, connection failures, malformed data
 - ✅ **End-to-End:** Complete user workflows and multi-user scenarios
+- ✅ **Browser Library:** Built UMD library testing with dynamic loading
 
 ### 4. Install Desktop Application
 
 The desktop app is implemented in Go using the Fyne UI toolkit for native performance and minimal resource usage.
 
-#### macOS/Windows/Linux Build
+#### Development Mode
 
 ```bash
 cd desktop
 # Run the desktop app in development mode
 go run web-ide-bridge.go
-# Or build a binary for your platform
-# First modify web-ide-bridge.conf to match your organization, then
-go build -o web-ide-bridge web-ide-bridge.go
 ```
+
+#### Production Build
+
+```bash
+cd desktop
+# Build a binary for your platform
+go build -o web-ide-bridge web-ide-bridge.go
+
+# The app will automatically use platform-specific icons from the build/ directory
+```
+
+**Features:**
+- 🎨 **Native App Icons**: Automatically uses platform-specific icons (PNG format for cross-platform compatibility)
+- 📱 **Modern UI**: Clean, centered header with app icon and version badge
+- ⚙️ **Configuration Management**: Supports multiple config file locations with embedded defaults
+- 🔄 **Real-time Status**: Connection status and activity monitoring
+- 🗂️ **File Watching**: Automatic detection of IDE file changes
 
 Configure your preferred IDE and WebSocket server URL on first launch.
 
-#### macOS Specific Build
+### 5. Try the Demos
 
-FIXME 
+Web-IDE-Bridge includes two demo pages to showcase the integration:
 
-#### Windows Specific Build
+```bash
+# Open demo pages in your browser
+open browser/demo.html          # Standard integration demo
+open browser/jquery-demo.html   # Custom UI integration demo
+```
 
-FIXME
+**Demo Features:**
+- 🎨 **Consistent Branding**: App icons, version badges, and favicons
+- 📝 **Interactive Examples**: Multiple textarea types with different file extensions
+- 🔧 **Configuration Panel**: Real-time connection settings
+- 📊 **Status Monitoring**: Live connection status and activity logs
+- 🎯 **Custom Integration**: jQuery demo shows manual button creation
 
-### 5. Integrate into Web Application
+### 6. Integrate into Web Application
 
 ```html
 <!-- Include the JavaScript library -->
@@ -253,7 +285,7 @@ webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
 </script>
 ```
 
-### 6. Usage Workflow
+### 7. Usage Workflow
 
 1. **🚀 Start Components**
    - Launch Web-IDE-Bridge server: `npm start` in server directory
@@ -290,12 +322,14 @@ webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
 - **File Type Detection**: Automatic syntax highlighting based on file extensions
 - **Connection Management**: Robust WebSocket connection with auto-reconnection
 
-### 📊 Visual Indicators
+### 📊 Visual Indicators & UI
 
 - **Connection Status**: Visual indicators when Web-IDE-Bridge is connected
 - **Active Sessions**: Desktop app shows active edit sessions
 - **Real-time Updates**: Changes appear in browser immediately after IDE save
-- **Status Dashboard**: Beautiful web interface showing server status and metrics
+- **Status Dashboard**: Beautiful web interface showing server status, metrics, and activity log
+- **App Icons**: Platform-specific icons for desktop app and consistent branding across all components
+- **Modern UI**: Clean, professional interface with proper spacing and typography
 
 ### 🔧 Multiple Edit Sessions
 
@@ -498,7 +532,9 @@ The status dashboard provides:
 - 📈 **Performance Metrics**: Message throughput, response times, memory usage
 - 👥 **User Sessions**: Active users and edit sessions
 - ⚙️ **Configuration Overview**: Current server settings
+- 📝 **Activity Log**: Real-time log of server events and user actions
 - 🔄 **Auto-refresh**: Updates every 30 seconds
+- 🎨 **Professional UI**: Clean design with app icons and consistent branding
 
 ### Health Monitoring
 
@@ -517,6 +553,7 @@ The status dashboard provides:
 - Active session details
 - Complete configuration dump
 - Process and memory statistics
+- Activity log entries
 
 ### Performance Metrics
 
@@ -524,7 +561,7 @@ The status dashboard provides:
 - **Throughput**: 20+ messages per second sustained
 - **Concurrent Connections**: 50+ simultaneous users tested
 - **Memory Usage**: <100MB typical server footprint
-- **Uptime**: Designed for 24/7 operation
+- **Uptime**: Designed for 24/7 operation with graceful shutdown handling
 
 ## 🔒 Security Considerations
 
@@ -668,9 +705,9 @@ cd web-ide-bridge
 npm install
 cd server && npm install && cd ..
 cd browser && npm install && cd ..
+
 # For desktop (Go/Fyne):
 cd desktop
-# Install Go dependencies (if needed)
 go mod tidy
 # Run the desktop app in development mode
 go run web-ide-bridge.go
@@ -682,7 +719,7 @@ cd ..
 npm test
 
 # Start development server
-cd server && npm run dev
+cd server && npm start
 
 # Make your changes and submit a pull request
 ```
