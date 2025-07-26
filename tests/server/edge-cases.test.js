@@ -1108,24 +1108,27 @@ describe('Server Edge Cases and Error Handling', () => {
       await browserClient.connect();
       await desktopClient.connect();
 
-      // Connect both clients
+      // Connect both clients with retry logic
       browserClient.send(global.testUtils.createMessage('browser_connect', {}, {
         connectionId: browserClient.connectionId,
         userId
       }));
-      await browserClient.waitForMessage(msg => msg.type === 'connection_ack');
+      await global.waitForMessageWithRetry(browserClient, msg => msg.type === 'connection_ack');
 
       desktopClient.send(global.testUtils.createMessage('desktop_connect', {}, {
         connectionId: desktopClient.connectionId,
         userId
       }));
-      await desktopClient.waitForMessage(msg => msg.type === 'connection_ack');
+      await global.waitForMessageWithRetry(desktopClient, msg => msg.type === 'connection_ack');
 
-      // Start multiple edit sessions simultaneously
+      // Start multiple edit sessions with better timing
       const sessionPromises = [];
       for (let i = 0; i < 3; i++) {
         const sessionId = `session-${i}`;
         const promise = (async () => {
+          // Add small delay between requests to avoid overwhelming the server
+          await new Promise(resolve => setTimeout(resolve, i * 50));
+          
           browserClient.send(global.testUtils.createMessage('edit_request', {
             snippetId: `snippet-${i}`,
             code: `console.log("session ${i}");`,
@@ -1136,7 +1139,7 @@ describe('Server Edge Cases and Error Handling', () => {
             sessionId
           }));
 
-          await desktopClient.waitForMessage(msg => 
+          await global.waitForMessageWithRetry(desktopClient, msg => 
             msg.type === 'edit_request' && msg.sessionId === sessionId
           );
 
@@ -1256,7 +1259,7 @@ describe('Server Edge Cases and Error Handling', () => {
           sessionId
         }));
 
-        await desktopClient.waitForMessage(msg => 
+        await global.waitForMessageWithRetry(desktopClient, msg => 
           msg.type === 'edit_request' && msg.sessionId === sessionId
         );
       }

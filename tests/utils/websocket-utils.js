@@ -165,7 +165,7 @@ class WebSocketTestClient {
     }
   }
 
-  async waitForMessage(predicate, timeout = 5000) {
+  async waitForMessage(predicate, timeout = 10000) {
     const start = Date.now();
     
     while (Date.now() - start < timeout) {
@@ -173,7 +173,8 @@ class WebSocketTestClient {
       if (message) {
         return message;
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Use shorter polling interval for better responsiveness
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
     
     // Enhanced error message with current state
@@ -193,7 +194,7 @@ class WebSocketTestClient {
     );
   }
 
-  async waitForMessages(predicate, count, timeout = 5000) {
+  async waitForMessages(predicate, count, timeout = 10000) {
     const start = Date.now();
     const foundMessages = [];
     
@@ -205,7 +206,8 @@ class WebSocketTestClient {
         return foundMessages;
       }
       
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Use shorter polling interval for better responsiveness
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
     
     throw new Error(

@@ -37,6 +37,9 @@ bower_components
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
+# Compiled go binaries
+bin/
+
 # Dependency directories
 node_modules/
 jspm_packages/
@@ -142,6 +145,7 @@ vite.config.ts.timestamp-*
 *.save[1-9]
 *.save[1-9][0-9]
 *.save[1-9][0-9][0-9]
+tmp*
 
 # macOS
 .DS_Store

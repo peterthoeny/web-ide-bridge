@@ -1,6 +1,6 @@
-# Web-IDE-Bridge Developer Context v0.1.3 (work in progress)
+# Web-IDE-Bridge Technical Implementation Guide v0.1.3
 
-**Technical implementation guide and architecture documentation**
+**Advanced technical documentation for contributors and implementers**
 
 ## System Architecture
 

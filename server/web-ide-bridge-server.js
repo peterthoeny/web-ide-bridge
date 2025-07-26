@@ -16,8 +16,8 @@ const { v4: uuidv4 } = require('uuid');
  * WebSocket relay server that bridges web applications with desktop IDEs
  */
 class WebIdeBridgeServer {
-  constructor() {
-    this.config = this.loadConfiguration();
+  constructor(config = null) {
+    this.config = config || this.loadConfiguration();
     this.validateConfiguration(this.config);
 
     this.app = express();

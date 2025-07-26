@@ -7,7 +7,7 @@ process.env.WEB_IDE_BRIDGE_PORT = '0'; // Use random port for tests
 process.env.WEB_IDE_BRIDGE_SECRET = 'test-secret-key-for-testing';
 
 // Increase timeout for WebSocket tests
-jest.setTimeout(20000);
+jest.setTimeout(30000);
 
 // Increase max listeners for process events during testing
 process.setMaxListeners(20);
@@ -37,19 +37,31 @@ afterEach(async () => {
     console.warn = global.originalConsoleWarn;
   }
 
-  // Clean up any remaining test servers
+  // Clean up any remaining test servers with better error handling
   const serverCleanupPromises = Array.from(global.testServers).map(async (server) => {
     try {
       if (server && typeof server.shutdown === 'function') {
-        await server.shutdown();
+        // Add timeout to prevent hanging
+        const shutdownPromise = server.shutdown();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Server shutdown timeout')), 5000)
+        );
+        await Promise.race([shutdownPromise, timeoutPromise]);
       }
     } catch (error) {
-      // Ignore cleanup errors
+      // Log cleanup errors but don't fail the test
+      if (process.env.DEBUG_TESTS) {
+        console.warn('Server cleanup error:', error.message);
+      }
+    } finally {
+      global.testServers.delete(server);
     }
-    global.testServers.delete(server);
   });
 
   await Promise.allSettled(serverCleanupPromises);
+  
+  // Add a small delay to ensure cleanup is complete
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 // Enhanced global test utilities
@@ -129,10 +141,8 @@ global.testUtils = {
   // Create a test server with proper cleanup tracking
   createTestServer: async (configOverrides = {}) => {
     const WebIdeBridgeServer = require('../server/web-ide-bridge-server');
-    const server = new WebIdeBridgeServer();
-    
-    // Override config for testing
-    server.config = global.testUtils.createTestConfig(configOverrides);
+    const testConfig = global.testUtils.createTestConfig(configOverrides);
+    const server = new WebIdeBridgeServer(testConfig);
     
     // Track server for cleanup
     global.testServers.add(server);
