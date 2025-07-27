@@ -111,6 +111,15 @@ type Config struct {
 func defaultConfig() Config {
 	usr, _ := user.Current()
 	userID := usr.Username
+
+	// On Windows, strip domain prefix from username (e.g., "FOO\jsmith" -> "jsmith")
+	if runtime.GOOS == "windows" && strings.Contains(userID, "\\") {
+		parts := strings.Split(userID, "\\")
+		if len(parts) == 2 {
+			userID = parts[1]
+		}
+	}
+
 	appCfg, _ := loadAppConfig()
 	fmt.Printf("[DEBUG] Loaded org config: ws_url=%q, ides=%v\n", appCfg.WSURL, appCfg.DefaultIDEs)
 	wsURL := "ws://localhost:8071/web-ide-bridge/ws" // fallback default
