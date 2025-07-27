@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge-server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "WebSocket relay server for Web-IDE-Bridge - bridges web applications to desktop IDEs",
   "main": "web-ide-bridge-server.js",
   "bin": {

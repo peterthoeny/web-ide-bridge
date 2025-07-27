@@ -1067,9 +1067,10 @@ describe('Server Edge Cases and Error Handling', () => {
       await client1.waitForMessage(msg => msg.type === 'connection_ack');
       await client2.waitForMessage(msg => msg.type === 'connection_ack');
 
-      // Should have latest connection for user
+      // Should have both connections for user
       const userSession = server.userSessions.get(userId);
-      expect(userSession.browserId).toBe(client2.connectionId);
+      expect(userSession.browserIds.has(client1.connectionId)).toBe(true);
+      expect(userSession.browserIds.has(client2.connectionId)).toBe(true);
 
       await client1.close();
       await client2.close();
@@ -1280,7 +1281,7 @@ describe('Server Edge Cases and Error Handling', () => {
       
       // User session should be partially cleaned
       const userSession = server.userSessions.get(userId);
-      expect(userSession.browserId).toBeUndefined();
+      expect(userSession.browserIds.size).toBe(0);
       expect(userSession.desktopId).toBeDefined(); // Desktop still connected
 
       await desktopClient.close();

@@ -232,7 +232,7 @@ describe('WebIdeBridge Client', () => {
 
       const updateData = {
         type: 'code_update',
-        snippetId: 'test-snippet',
+          snippetId: 'test-snippet',
         code: 'updated code'
       };
 

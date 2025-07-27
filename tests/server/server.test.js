@@ -67,7 +67,7 @@ describe('WebIdeBridgeServer Core', () => {
       
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
-      expect(data.version).toBe('1.0.2');
+      expect(data.version).toBe('1.0.3');
       expect(data.uptime).toBeGreaterThanOrEqual(0);
       expect(data.timestamp).toBeDefined();
     });
@@ -84,7 +84,7 @@ describe('WebIdeBridgeServer Core', () => {
       
       expect(response.status).toBe(200);
       expect(data.active).toBe(true);
-      expect(data.version).toBe('1.0.2');
+      expect(data.version).toBe('1.0.3');
       expect(data.connections).toHaveProperty('browser');
       expect(data.connections).toHaveProperty('desktop');
       expect(data.connections).toHaveProperty('total');

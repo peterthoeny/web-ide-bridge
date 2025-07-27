@@ -33,6 +33,7 @@ class UIManager {
     this.observers = [];
     this.styles = null;
     this.initialized = false;
+    this.statusCallbackRegistered = false; // Track if we've already registered status callback
   }
 
   /**
@@ -133,23 +134,26 @@ class UIManager {
    * Update button states based on connection status
    */
   updateButtonStates(connected) {
-    this.injectedButtons.forEach(button => {
-      this._updateButtonState(button);
+    this.injectedButtons.forEach((button, textareaId) => {
+      this._updateButtonState(button, connected);
     });
   }
 
   /**
    * Update individual button state based on connection status
    */
-  _updateButtonState(button) {
-    const isConnected = this.webIdeBridge.isConnected();
-    button.disabled = !isConnected;
-    if (isConnected) {
-      button.textContent = button.dataset.originalText || 'Edit in IDE ↗';
+  _updateButtonState(button, connected = null) {
+    // Button should be enabled if server is connected, regardless of desktop connection
+    // Desktop connection is only needed for roundtrip functionality
+    const serverConnected = connected !== null ? connected : this.webIdeBridge.isConnected();
+    button.disabled = !serverConnected;
+
+    // Always keep the original button text
+    button.textContent = button.dataset.originalText || 'Edit in IDE ↗';
+    if (serverConnected) {
       button.title = '';
     } else {
-      button.textContent = 'Connect to Server First';
-      button.title = 'Web-IDE-Bridge server is not connected. Please open the edit demo and connect first.';
+      button.title = 'Web-IDE-Bridge server is not connected. Please connect first.';
     }
   }
 
@@ -304,6 +308,14 @@ class UIManager {
       if (this.injectedButtons.has(textarea.id)) {
         return;
       }
+
+      // Additional check: look for existing buttons in the DOM
+      const existingButton = textarea.parentNode.querySelector(`[data-textarea-id="${textarea.id}"]`);
+      if (existingButton) {
+        // Button exists in DOM but not in our tracking - add it to tracking
+        this.injectedButtons.set(textarea.id, existingButton);
+        return;
+      }
       const fileType = textarea.getAttribute(config.fileTypeAttribute) || config.defaultFileType;
       this._createAndInjectButton(textarea, {
         ...config,
@@ -361,10 +373,13 @@ class UIManager {
     }
     this.injectedButtons.set(textarea.id, button);
 
-    // Update button state based on connection
-    this.webIdeBridge.onStatusChange(status => {
-      this.updateButtonStates(status.serverConnected);
-    });
+    // Register status callback only once for all buttons
+    if (!this.statusCallbackRegistered) {
+      this.webIdeBridge.onStatusChange(status => {
+        this.updateButtonStates(status.serverConnected);
+      });
+      this.statusCallbackRegistered = true;
+    }
     return button;
   }
 
@@ -1140,17 +1155,18 @@ class WebIdeBridge {
       userId: this.userId,
       timestamp: Date.now()
     };
-    try {
-      this._sendMessage(connectMessage);
-      this._startHeartbeat();
-
-      // Auto-inject buttons if enabled
-      if (this.options.addButtons) {
-        this.autoInjectButtons();
+    setTimeout(() => {
+      // Use setTimeout to ensure WebSocket is ready
+      try {
+        this._sendMessage(connectMessage);
+        this._startHeartbeat();
+        if (this.options.addButtons) {
+          this.autoInjectButtons();
+        }
+      } catch (error) {
+        this._log('Error in connection open handler', error);
       }
-    } catch (error) {
-      this._log('Error in connection open handler', error);
-    }
+    }, 0);
   }
 
   /**
@@ -1192,7 +1208,18 @@ class WebIdeBridge {
   _handleMessage(event) {
     try {
       const message = JSON.parse(event.data);
-      this._log('Received message', message);
+
+      // For code_update messages, log a summary instead of full content
+      if (message.type === 'code_update' && message.code) {
+        this._log('Received code_update message', {
+          type: message.type,
+          snippetId: message.snippetId,
+          codeLength: message.code.length,
+          codePreview: message.code.length > 100 ? `${message.code.substring(0, 100)}...${message.code.substring(message.code.length - 20)}` : message.code
+        });
+      } else {
+        this._log('Received message', message);
+      }
 
       // Trigger message callbacks
       this.messageCallbacks.forEach(callback => {
@@ -1432,7 +1459,16 @@ class WebIdeBridge {
     if (this.options.debug) {
       const logMessage = `[WebIdeBridge] ${message}`;
       if (data) {
-        console.log(logMessage, data);
+        // Handle large objects (like code_update messages)
+        if (typeof data === 'object' && data.code && data.code.length > 100) {
+          const shortenedData = {
+            ...data,
+            code: `${data.code.substring(0, 100)}...${data.code.substring(data.code.length - 20)} (${data.code.length} chars total)`
+          };
+          console.log(logMessage, shortenedData);
+        } else {
+          console.log(logMessage, data);
+        }
       } else {
         console.log(logMessage);
       }

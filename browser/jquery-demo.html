@@ -446,7 +446,7 @@
         <div class="header">
             <img src="assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
             <span class="title">Web-IDE-Bridge jQuery Demo</span>
-            <span class="version">v1.0.2</span>
+            <span class="version">v1.0.3</span>
         </div>
         <p class="subtitle">Custom UI integration using jQuery and Web-IDE-Bridge</p>
         <!-- (Copy the rest of the HTML structure from demo.html, but do NOT include any auto-injected buttons) -->
@@ -711,45 +711,47 @@ for (let i = 0; i < 10; i++) {
             logActivity(`Using persistent connection ID: ${connectionId}`, 'info');
             logActivity(`Connecting to: ${wsUrl}`, 'info');
             updateSessionStatus('active', `User: ${user}, Reconnect: ${reconnectTime}ms`);
-            webIdeBridge = new WebIdeBridge(user, {
-                serverUrl: wsUrl,
-                reconnectInterval: reconnectTime,
-                autoReconnect: true,
-                debug: true,
-                connectionId: connectionId,
-                addButtons: false
-            });
-            webIdeBridge.onStatusChange((status) => {
-                isConnected = status.serverConnected;
-                updateBrowserServerStatus(status.serverConnected);
-                updateServerDesktopStatus(status.desktopConnected);
-                logActivity(`Browser-Server connection: ${status.serverConnected ? 'connected' : 'disconnected'}`, status.serverConnected ? 'success' : 'info');
-                logActivity(`Desktop connection: ${status.desktopConnected ? 'connected' : 'disconnected'}`, status.desktopConnected ? 'success' : 'info');
-            });
-            webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
-                const textarea = document.getElementById(snippetId);
-                if (textarea) {
-                    textarea.value = updatedCode;
-                    logActivity(`Code updated for ${snippetId}`, 'success');
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-                // Send info message back to server on successful update
-                if (webIdeBridge && webIdeBridge.isConnected()) {
-                    webIdeBridge._sendMessage({
-                        type: 'info',
-                        connectionId: webIdeBridge.connectionId,
-                        userId: webIdeBridge.userId,
-                        payload: {
-                            snippetId,
-                            message: `Code has been updated in web editor field ${snippetId}`
-                        }
-                    });
-                }
-            });
-            webIdeBridge.onError((error) => {
-                logActivity(`Error: ${error}`, 'error');
-                updateSessionStatus('error', error);
-            });
+            if (!webIdeBridge) {
+                webIdeBridge = new WebIdeBridge(user, {
+                    serverUrl: wsUrl,
+                    reconnectInterval: reconnectTime,
+                    autoReconnect: true,
+                    debug: true,
+                    connectionId: connectionId,
+                    addButtons: false
+                });
+                webIdeBridge.onStatusChange((status) => {
+                    isConnected = status.serverConnected;
+                    updateBrowserServerStatus(status.serverConnected);
+                    updateServerDesktopStatus(status.desktopConnected);
+                    logActivity(`Browser-Server connection: ${status.serverConnected ? 'connected' : 'disconnected'}`, status.serverConnected ? 'success' : 'info');
+                    logActivity(`Desktop connection: ${status.desktopConnected ? 'connected' : 'disconnected'}`, status.desktopConnected ? 'success' : 'info');
+                });
+                webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
+                    const textarea = document.getElementById(snippetId);
+                    if (textarea) {
+                        textarea.value = updatedCode;
+                        logActivity(`Code updated for ${snippetId}`, 'success');
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    // Send info message back to server on successful update
+                    if (webIdeBridge && webIdeBridge.isConnected()) {
+                        webIdeBridge._sendMessage({
+                            type: 'info',
+                            connectionId: webIdeBridge.connectionId,
+                            userId: webIdeBridge.userId,
+                            payload: {
+                                snippetId,
+                                message: `Code has been updated in web editor field ${snippetId}`
+                            }
+                        });
+                    }
+                });
+                webIdeBridge.onError((error) => {
+                    logActivity(`Error: ${error}`, 'error');
+                    updateSessionStatus('error', error);
+                });
+            }
             updateBrowserServerStatus(false);
             await webIdeBridge.connect();
             logActivity('Successfully connected to Web-IDE-Bridge server!', 'success');
@@ -767,7 +769,7 @@ for (let i = 0; i < 10; i++) {
         isEditDemoOpen = false;
         if (webIdeBridge) {
             webIdeBridge.disconnect();
-            webIdeBridge = null;
+            // Don't set to null - keep the instance for reconnection
         }
         updateBrowserServerStatus(false);
         updateServerDesktopStatus(false);

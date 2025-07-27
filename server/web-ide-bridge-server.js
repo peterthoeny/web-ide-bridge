@@ -29,7 +29,7 @@ class WebIdeBridgeServer {
     // Connection tracking
     this.browserConnections = new Map(); // connectionId -> {ws, userId, sessionInfo}
     this.desktopConnections = new Map(); // connectionId -> {ws, userId}
-    this.userSessions = new Map();       // userId -> {browserId, desktopId}
+    this.userSessions = new Map();       // userId -> {browserIds: Set, desktopId}
     this.activeSessions = new Map();     // sessionId -> {userId, snippetId, browserConnectionId}
 
     // Rate limiting store
@@ -603,7 +603,8 @@ class WebIdeBridgeServer {
 
     // Update user session
     const userSession = this.userSessions.get(userId) || {};
-    userSession.browserId = ws.connectionId;
+    if (!userSession.browserIds) userSession.browserIds = new Set();
+    userSession.browserIds.add(ws.connectionId);
     this.userSessions.set(userId, userSession);
 
     this.metrics.activeConnections.browser = this.browserConnections.size;
@@ -722,7 +723,7 @@ class WebIdeBridgeServer {
     this.addActivityLogEntry(`Edit request: ${userId} → ${snippetId}`, 'info');
 
     if (this.config.debug) {
-      console.log(`Edit request: userId=${userId}, snippetId=${snippetId}`);
+      console.log(`Edit request: userId=${userId}, snippetId=${snippetId}, codeLength=${code.length}`);
     }
   }
 
@@ -766,13 +767,17 @@ class WebIdeBridgeServer {
     // Update session activity
     session.lastActivity = Date.now();
 
-    // Always get the latest browser connection for this userId:snippetId
+    // Get all browser connections for this user
     const userSession = this.userSessions.get(userId);
-    let browserConn = null;
-    if (userSession && userSession.browserId) {
-      browserConn = this.browserConnections.get(userSession.browserId);
+    if (this.config.debug) {
+      console.log(`User session for ${userId}:`, userSession);
+      console.log(`Browser IDs:`, userSession ? Array.from(userSession.browserIds || []) : 'no session');
     }
-    if (!browserConn) {
+
+    if (!userSession || !userSession.browserIds || userSession.browserIds.size === 0) {
+      if (this.config.debug) {
+        console.log(`No browser connections found for user ${userId}`);
+      }
       // Send info message to desktop
       const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
       if (desktopConn) {
@@ -788,18 +793,49 @@ class WebIdeBridgeServer {
       return;
     }
 
-    // Forward to browser
-    this.sendMessage(browserConn.ws, {
-      type: 'code_update',
-      snippetId: session.snippetId,
-      code: code
+    // Forward to all browser connections for this user
+    let delivered = false;
+    if (this.config.debug) {
+      console.log(`Attempting to deliver code update to ${userSession.browserIds.size} browser connections`);
+    }
+
+    userSession.browserIds.forEach(browserId => {
+      const browserConn = this.browserConnections.get(browserId);
+      if (this.config.debug) {
+        console.log(`Browser connection ${browserId}:`, browserConn ? 'found' : 'not found');
+      }
+      if (browserConn) {
+        this.sendMessage(browserConn.ws, {
+          type: 'code_update',
+          snippetId: session.snippetId,
+          code: code
+        });
+        delivered = true;
+        if (this.config.debug) {
+          console.log(`Code update delivered to browser ${browserId}`);
+        }
+      }
     });
+
+    if (!delivered) {
+      // Send info message to desktop if no browser connections were available
+      const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
+      if (desktopConn) {
+        this.sendMessage(desktopConn.ws, {
+          type: 'info',
+          payload: {
+            snippetId: session.snippetId,
+            message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+          }
+        });
+      }
+    }
 
     // Add to activity log
     this.addActivityLogEntry(`Code update: ${userId} ← ${session.snippetId}`, 'info');
 
     if (this.config.debug) {
-      console.log(`Code update: userId=${userId}, snippetId=${session.snippetId}`);
+      console.log(`Code update: userId=${userId}, snippetId=${session.snippetId}, codeLength=${code.length}`);
     }
   }
 
@@ -850,9 +886,10 @@ class WebIdeBridgeServer {
 
       // Update user session
       const userSession = this.userSessions.get(browserConn.userId);
-      if (userSession && userSession.browserId === ws.connectionId) {
-        delete userSession.browserId;
-        if (Object.keys(userSession).length === 0) {
+      if (userSession && userSession.browserIds) {
+        userSession.browserIds.delete(ws.connectionId);
+        // Remove user session if no browser connections and no desktop connection
+        if (userSession.browserIds.size === 0 && !userSession.desktopId) {
           this.userSessions.delete(browserConn.userId);
         }
       }
@@ -871,7 +908,8 @@ class WebIdeBridgeServer {
       const userSession = this.userSessions.get(desktopConn.userId);
       if (userSession && userSession.desktopId === ws.connectionId) {
         delete userSession.desktopId;
-        if (Object.keys(userSession).length === 0) {
+        // Remove user session if no browser connections and no desktop connection
+        if ((!userSession.browserIds || userSession.browserIds.size === 0) && !userSession.desktopId) {
           this.userSessions.delete(desktopConn.userId);
         }
       }
@@ -1742,25 +1780,52 @@ class WebIdeBridgeServer {
 
   sendDesktopStatusToBrowser(userId) {
     const userSession = this.userSessions.get(userId);
-    if (!userSession || !userSession.browserId) return;
-    const browserConn = this.browserConnections.get(userSession.browserId);
-    if (!browserConn) return;
+    if (!userSession || !userSession.browserIds || userSession.browserIds.size === 0) return;
+
     const desktopConnected = !!(userSession && userSession.desktopId && this.desktopConnections.has(userSession.desktopId));
-    this.sendMessage(browserConn.ws, {
-      type: 'status_update',
-      desktopConnected
+
+    // Send status update to all browser connections for this user
+    userSession.browserIds.forEach(browserId => {
+      const browserConn = this.browserConnections.get(browserId);
+      if (browserConn) {
+        this.sendMessage(browserConn.ws, {
+          type: 'status_update',
+          desktopConnected
+        });
+      }
     });
   }
+
   sendBrowserStatusToDesktop(userId) {
     const userSession = this.userSessions.get(userId);
     if (!userSession || !userSession.desktopId) return;
     const desktopConn = this.desktopConnections.get(userSession.desktopId);
     if (!desktopConn) return;
-    const browserConnected = !!(userSession && userSession.browserId && this.browserConnections.has(userSession.browserId));
+
+    // Check if user has any active browser connections
+    const browserConnected = !!(userSession && userSession.browserIds && userSession.browserIds.size > 0);
+
     this.sendMessage(desktopConn.ws, {
       type: 'status_update',
       browserConnected
     });
+  }
+
+  /**
+   * Smart logging helper for large objects
+   */
+  _smartLog(message, data = null) {
+    if (!this.config.debug) return;
+
+    if (data && typeof data === 'object' && data.code && data.code.length > 100) {
+      const shortenedData = {
+        ...data,
+        code: `${data.code.substring(0, 100)}...${data.code.substring(data.code.length - 20)} (${data.code.length} chars total)`
+      };
+      console.log(message, shortenedData);
+    } else {
+      console.log(message, data);
+    }
   }
 
   /**

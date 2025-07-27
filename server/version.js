@@ -1,7 +1,7 @@
 // Web-IDE-Bridge Server Version Configuration
 // Update this file to bump the version for the server component
 
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 
 module.exports = {
   VERSION,

@@ -1,4 +1,4 @@
-# Web-IDE-Bridge Technical Implementation Guide v1.0.2
+# Web-IDE-Bridge Technical Implementation Guide v1.0.3
 
 **Advanced technical documentation for contributors and implementers**
 
@@ -46,16 +46,16 @@ Browser → Server → Desktop → IDE
   │         │         │       │
   │         │         │       └─ Launch with temp file
   │         │         └─ Save code to temp file
-  │         └─ Route by user session
+  │         └─ Route by user session (supports multiple browser connections)
   └─ Send code + metadata
 ```
 
 #### Save Sync Flow  
 ```
-IDE → Desktop → Server → Browser
+IDE → Desktop → Server → Browser(s)
  │       │        │        │
- │       │        │        └─ Update textarea content
- │       │        └─ Route by session ID
+ │       │        │        └─ Update textarea content in all connected browsers
+ │       │        └─ Route by session ID to all user's browser connections
  │       └─ Detect file change & read
  └─ User saves file
 ```
@@ -72,9 +72,10 @@ All messages use JSON format with the following structure:
   "connectionId": "uuid-v4-string", 
   "userId": "user-identifier",
   "snippetId": "edit-snippet-id",
-  "payload": {
-    // Message-specific data
-  }
+  // Message-specific fields directly in the root object
+  "code": "code content",
+  "fileType": "js",
+  "timestamp": 1234567890
 }
 ```
 
@@ -290,10 +291,10 @@ class ConnectionManager {
 
 ### Session Recovery and Cleanup
 ```javascript
-// Session management with cleanup
+// Session management with cleanup and multiple browser connections per user
 class SessionManager {
   constructor() {
-    this.sessions = new Map();
+    this.sessions = new Map(); // userId -> {browserIds: Set, desktopId, activeSessions}
     this.tempFiles = new Map();
     this.cleanupInterval = 60000; // 1 minute
     this.maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours

@@ -11,6 +11,7 @@ export class UIManager {
     this.observers = [];
     this.styles = null;
     this.initialized = false;
+    this.statusCallbackRegistered = false; // Track if we've already registered status callback
   }
 
   /**
@@ -111,23 +112,26 @@ export class UIManager {
    * Update button states based on connection status
    */
   updateButtonStates(connected) {
-    this.injectedButtons.forEach(button => {
-      this._updateButtonState(button);
+    this.injectedButtons.forEach((button, textareaId) => {
+      this._updateButtonState(button, connected);
     });
   }
 
   /**
    * Update individual button state based on connection status
    */
-  _updateButtonState(button) {
-    const isConnected = this.webIdeBridge.isConnected();
-    button.disabled = !isConnected;
-    if (isConnected) {
-      button.textContent = button.dataset.originalText || 'Edit in IDE ↗';
+  _updateButtonState(button, connected = null) {
+    // Button should be enabled if server is connected, regardless of desktop connection
+    // Desktop connection is only needed for roundtrip functionality
+    const serverConnected = connected !== null ? connected : this.webIdeBridge.isConnected();
+    button.disabled = !serverConnected;
+
+    // Always keep the original button text
+    button.textContent = button.dataset.originalText || 'Edit in IDE ↗';
+    if (serverConnected) {
       button.title = '';
     } else {
-      button.textContent = 'Connect to Server First';
-      button.title = 'Web-IDE-Bridge server is not connected. Please open the edit demo and connect first.';
+      button.title = 'Web-IDE-Bridge server is not connected. Please connect first.';
     }
   }
 
@@ -288,6 +292,14 @@ export class UIManager {
         return;
       }
 
+      // Additional check: look for existing buttons in the DOM
+      const existingButton = textarea.parentNode.querySelector(`[data-textarea-id="${textarea.id}"]`);
+      if (existingButton) {
+        // Button exists in DOM but not in our tracking - add it to tracking
+        this.injectedButtons.set(textarea.id, existingButton);
+        return;
+      }
+
       const fileType = textarea.getAttribute(config.fileTypeAttribute) || config.defaultFileType;
 
       this._createAndInjectButton(textarea, {
@@ -350,10 +362,13 @@ export class UIManager {
 
     this.injectedButtons.set(textarea.id, button);
 
-    // Update button state based on connection
-    this.webIdeBridge.onStatusChange((status) => {
-      this.updateButtonStates(status.serverConnected);
-    });
+    // Register status callback only once for all buttons
+    if (!this.statusCallbackRegistered) {
+      this.webIdeBridge.onStatusChange((status) => {
+        this.updateButtonStates(status.serverConnected);
+      });
+      this.statusCallbackRegistered = true;
+    }
 
     return button;
   }

@@ -165,9 +165,9 @@ class WebIdeBridge {
       connectionId: this.connectionId,
       userId: this.userId,
       snippetId: textareaId,
-      code,
-      fileType: fileType || 'txt',
-      timestamp: Date.now()
+        code,
+        fileType: fileType || 'txt',
+        timestamp: Date.now()
     };
 
     this._log('Sending edit request', { textareaId, fileType });
@@ -311,17 +311,13 @@ class WebIdeBridge {
       timestamp: Date.now()
     };
 
-    try {
-      this._sendMessage(connectMessage);
-      this._startHeartbeat();
-
-      // Auto-inject buttons if enabled
-      if (this.options.addButtons) {
-        this.autoInjectButtons();
-      }
-    } catch (error) {
-      this._log('Error in connection open handler', error);
-    }
+    setTimeout(() => { // Use setTimeout to ensure WebSocket is ready
+      try {
+        this._sendMessage(connectMessage);
+        this._startHeartbeat();
+        if (this.options.addButtons) { this.autoInjectButtons(); }
+      } catch (error) { this._log('Error in connection open handler', error); }
+    }, 0);
   }
 
   /**
@@ -362,7 +358,20 @@ class WebIdeBridge {
   _handleMessage(event) {
     try {
       const message = JSON.parse(event.data);
-      this._log('Received message', message);
+
+      // For code_update messages, log a summary instead of full content
+      if (message.type === 'code_update' && message.code) {
+        this._log('Received code_update message', {
+          type: message.type,
+          snippetId: message.snippetId,
+          codeLength: message.code.length,
+          codePreview: message.code.length > 100 
+            ? `${message.code.substring(0, 100)}...${message.code.substring(message.code.length - 20)}`
+            : message.code
+        });
+      } else {
+        this._log('Received message', message);
+      }
 
       // Trigger message callbacks
       this.messageCallbacks.forEach(callback => {
@@ -612,7 +621,16 @@ class WebIdeBridge {
     if (this.options.debug) {
       const logMessage = `[WebIdeBridge] ${message}`;
       if (data) {
-        console.log(logMessage, data);
+        // Handle large objects (like code_update messages)
+        if (typeof data === 'object' && data.code && data.code.length > 100) {
+          const shortenedData = {
+            ...data,
+            code: `${data.code.substring(0, 100)}...${data.code.substring(data.code.length - 20)} (${data.code.length} chars total)`
+          };
+          console.log(logMessage, shortenedData);
+        } else {
+          console.log(logMessage, data);
+        }
       } else {
         console.log(logMessage);
       }
