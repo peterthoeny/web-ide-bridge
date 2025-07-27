@@ -138,6 +138,15 @@ Web-IDE-Bridge consists of three components working together:
 
 **⚠️ Node.js Version Note:** This project has been tested and optimized for Node.js v18.20.8. Earlier versions may experience compatibility issues, particularly with ES modules and WebSocket testing.
 
+**🔧 Go Tools Setup:** For macOS app bundle creation, ensure Go tools are in your PATH:
+```bash
+# Add Go bin directory to PATH (add to ~/.bash_profile or ~/.zshrc)
+export PATH="$HOME/go/bin:$PATH"
+
+# Install Fyne CLI tool
+go install fyne.io/tools/cmd/fyne@latest
+```
+
 ### 1. Clone and Set Up the Project
 
 ```bash
@@ -311,12 +320,15 @@ GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=$(node -p "require('
 
 **Note:** GUI applications with native dependencies (like Fyne) have cross-compilation constraints. The build script will attempt all platforms but may only succeed for the current platform.
 
+**macOS App Bundle:** The build script also creates a proper `bin/darwin_amd64/Web-IDE-Bridge.app` bundle that appears correctly in Command+Tab and the dock. This requires the Fyne CLI tool to be installed and available in your PATH (see Go Tools Setup above).
+
 **Distribution:**
 ```bash
 # Create platform-specific release packages
 zip -r web-ide-bridge-darwin-amd64.zip bin/darwin_amd64/
 zip -r web-ide-bridge-linux-amd64.zip bin/linux_amd64/
 zip -r web-ide-bridge-windows-amd64.zip bin/windows_amd64/
+zip -r web-ide-bridge-macos-app.zip bin/darwin_amd64/Web-IDE-Bridge.app/  # macOS app bundle
 ```
 
 ### Version Management
@@ -334,9 +346,8 @@ node bump-version.js 1.0.1
 
 # Manual version updates (if needed)
 # 1. Update version.js
-# 2. Update desktop/version.go
-# 3. Update package.json files
-# 4. Update documentation files
+# 2. Update package.json files
+# 3. Update documentation files
 ```
 
 **✅ Files Automatically Updated:**
@@ -347,17 +358,10 @@ node bump-version.js 1.0.1
 - Demo HTML files
 ```
 
-**Build Outputs:**
-- `bin/darwin_amd64/web-ide-bridge` - macOS Intel (✅ builds successfully)
-- `bin/darwin_arm64/web-ide-bridge` - macOS Apple Silicon (⚠️ cross-compilation constraints)
-- `bin/linux_amd64/web-ide-bridge` - Linux Intel/AMD (⚠️ cross-compilation constraints)
-- `bin/windows_amd64/web-ide-bridge.exe` - Windows Intel/AMD (⚠️ cross-compilation constraints)
-
-**Note:** GUI applications with native dependencies (like Fyne) have cross-compilation constraints. The build script will attempt all platforms but may only succeed for the current platform.
-
 **Features:**
 - 🎨 **Native App Icons**: Automatically uses platform-specific icons (PNG format for cross-platform compatibility)
 - 📱 **Modern UI**: Clean, centered header with app icon and version badge
+- 🍎 **macOS Integration**: Proper app bundle with correct Command+Tab and dock display
 - ⚙️ **Configuration Management**: Supports multiple config file locations with embedded defaults
 - 🔄 **Real-time Status**: Connection status and activity monitoring
 - 🗂️ **File Watching**: Automatic detection of IDE file changes

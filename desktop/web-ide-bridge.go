@@ -93,6 +93,9 @@ var iconFS embed.FS
 //go:embed assets/web-ide-bridge-24.png
 var icon24 []byte
 
+//go:embed assets/web-ide-bridge.png
+var icon512 []byte
+
 // ----------------------
 // Persistent Config
 // ----------------------
@@ -644,32 +647,10 @@ func sectionHeader(title string) fyne.CanvasObject {
 
 // setupAppIcon sets the appropriate icon for the current platform
 func setupAppIcon(a fyne.App) {
-	var iconName string
-
-	// Use PNG format for all platforms since Fyne supports it natively
-	// .icns and .ico files are not directly supported by Go's image package
-	switch runtime.GOOS {
-	case "darwin":
-		iconName = "web-ide-bridge.png" // Use PNG instead of .icns
-	case "windows":
-		iconName = "web-ide-bridge.png" // Use PNG instead of .ico
-	default: // linux and others
-		iconName = "web-ide-bridge.png"
-	}
-
-	// Try to load icon from embedded filesystem
-	iconData, err := iconFS.ReadFile("assets/" + iconName)
-	if err != nil {
-		log.Printf("Warning: Could not load embedded icon %s: %v", iconName, err)
-		return
-	}
-
-	// Create a resource from the embedded icon data
-	iconResource := fyne.NewStaticResource(iconName, iconData)
-
-	// Set the app icon
+	// Use the embedded PNG icon for all platforms
+	iconResource := fyne.NewStaticResource("web-ide-bridge.png", icon512)
 	a.SetIcon(iconResource)
-	log.Printf("Set app icon: %s", iconName)
+	log.Printf("Set app icon for platform: %s", runtime.GOOS)
 }
 
 // ----------------------
@@ -679,12 +660,13 @@ func setupAppIcon(a fyne.App) {
 func main() {
 	cfg, _ := loadConfig()
 
-	a := app.New()
+	a := app.NewWithID("com.peterthoeny.web-ide-bridge")
 
 	// Set up platform-specific app icon
 	setupAppIcon(a)
 
 	w := a.NewWindow("Web-IDE-Bridge")
+	w.SetTitle("Web-IDE-Bridge")
 	w.Resize(fyne.NewSize(700, 720)) // wider window
 
 	// Activity Log Section (improved contrast)
