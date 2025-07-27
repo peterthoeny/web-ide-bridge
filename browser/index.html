@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-IDE-Bridge Demos</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2rem;
+            max-width: 1000px;
+            width: 90%;
+            margin: 0 auto 2rem;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        .header-icon {
+            width: 24px;
+            height: 24px;
+        }
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        .version {
+            color: #6b7280;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-left: 1rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #6b7280;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .intro-section {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .intro-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .intro-description {
+            color: #1e40af;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .demo-card {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+            border-color: #4f46e5;
+        }
+
+        .demo-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .demo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .demo-icon.auto {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .demo-icon.manual {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .demo-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .demo-subtitle {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 1rem;
+        }
+
+        .demo-description {
+            color: #4b5563;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            min-height: 6.4rem; /* 4 lines of text to ensure alignment */
+        }
+
+        .demo-features {
+            margin-bottom: 1.5rem;
+        }
+
+        .demo-features h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .demo-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+            text-align: center;
+            width: 100%;
+        }
+
+        .demo-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .comparison-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .comparison-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .comparison-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .comparison-table td {
+            color: #4b5563;
+        }
+
+        .comparison-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .footer a {
+            color: #4f46e5;
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+
+            .title {
+                font-size: 1.5rem;
+            }
+
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-table {
+                font-size: 0.75rem;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
+            <span class="title">Web-IDE-Bridge Demos</span>
+            <span class="version">v1.0.4</span>
+        </div>
+        <p class="subtitle">Choose your integration approach for seamless web-to-IDE editing</p>
+
+        <div class="intro-section">
+            <h2 class="intro-title">🎯 Demo Overview</h2>
+            <p class="intro-description">
+                Both demo pages simulate a web application where users open an edit screen to modify application logic. 
+                They showcase two different integration approaches for adding "Edit in IDE" functionality to your web applications.
+            </p>
+        </div>
+
+        <div class="demo-grid">
+            <div class="demo-card">
+                <div class="demo-card-header">
+                    <div class="demo-icon auto">A</div>
+                    <div>
+                        <div class="demo-title">Automatic Integration</div>
+                        <div class="demo-subtitle">demo.html</div>
+                    </div>
+                </div>
+                <p class="demo-description">
+                    Uses <code>addButtons: true</code> (default) where the Web-IDE-Bridge library automatically handles 
+                    button injection and code synchronization. Perfect for quick integration with minimal setup.
+                </p>
+                <div class="demo-features">
+                    <h4>Features:</h4>
+                    <ul class="feature-list">
+                        <li>Automatic "Edit in IDE" button injection</li>
+                        <li>Handles code updates after IDE roundtrip</li>
+                        <li>Zero manual DOM manipulation required</li>
+                        <li>Works with any textarea element</li>
+                        <li>Minimal JavaScript setup</li>
+                    </ul>
+                </div>
+                <a href="demo.html" class="demo-link">Try Automatic Demo →</a>
+            </div>
+
+            <div class="demo-card">
+                <div class="demo-card-header">
+                    <div class="demo-icon manual">M</div>
+                    <div>
+                        <div class="demo-title">Manual Integration</div>
+                        <div class="demo-subtitle">jquery-demo.html</div>
+                    </div>
+                </div>
+                <p class="demo-description">
+                    Uses <code>addButtons: false</code> with jQuery for complete control over UI and behavior. 
+                    Demonstrates custom button creation and manual code update handling.
+                </p>
+                <div class="demo-features">
+                    <h4>Features:</h4>
+                    <ul class="feature-list">
+                        <li>Custom "Edit in IDE" button implementation</li>
+                        <li>Manual code update handling</li>
+                        <li>Full control over UI and styling</li>
+                        <li>jQuery-based event handling</li>
+                        <li>Custom integration patterns</li>
+                    </ul>
+                </div>
+                <a href="jquery-demo.html" class="demo-link">Try Manual Demo →</a>
+            </div>
+        </div>
+
+        <div class="comparison-section">
+            <h2 class="comparison-title">📊 Integration Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Automatic (demo.html)</th>
+                        <th>Manual (jquery-demo.html)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Setup Complexity</strong></td>
+                        <td>Minimal - just initialize library</td>
+                        <td>Moderate - requires custom UI code</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Button Creation</strong></td>
+                        <td>Automatic injection</td>
+                        <td>Manual creation with jQuery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Code Updates</strong></td>
+                        <td>Automatic textarea updates</td>
+                        <td>Manual event handling</td>
+                    </tr>
+                    <tr>
+                        <td><strong>UI Control</strong></td>
+                        <td>Limited - uses default styling</td>
+                        <td>Complete - full styling control</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dependencies</strong></td>
+                        <td>Web-IDE-Bridge only</td>
+                        <td>Web-IDE-Bridge + jQuery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>Quick integration, prototypes</td>
+                        <td>Production apps, custom UI</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>
+                <a href="/web-ide-bridge/status">Server Status</a>
+                <a href="https://github.com/peterthoeny/web-ide-bridge">GitHub</a>
+                <a href="../README.md">Documentation</a>
+            </p>
+            <p style="margin-top: 0.5rem;">
+                Web-IDE-Bridge Demos - Choose your integration approach
+            </p>
+        </div>
+    </div>
+</body>
+</html> 

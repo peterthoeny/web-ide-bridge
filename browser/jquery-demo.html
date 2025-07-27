@@ -409,6 +409,24 @@
             text-decoration: underline;
         }
 
+        .back-to-demos-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            color: white !important;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-to-demos-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+            text-decoration: none;
+        }
+
         @media (max-width: 640px) {
             .container {
                 margin: 1rem;
@@ -605,12 +623,15 @@ for (let i = 0; i < 10; i++) {
         </div>
         <div class="footer">
             <p>
-                <a href="/web-ide-bridge/status">Server Status</a>
+                <a href="/web-ide-bridge/status" id="serverStatusLink">Server Status</a>
                 <a href="https://github.com/peterthoeny/web-ide-bridge">GitHub</a>
                 <a href="../README.md">Documentation</a>
             </p>
             <p style="margin-top: 0.5rem;">
                 Web-IDE-Bridge jQuery Demo - Custom UI integration
+            </p>
+            <p style="margin-top: 1rem;">
+                <a href="index.html" class="back-to-demos-btn">← Back to Demos</a>
             </p>
         </div>
     </div>
@@ -637,6 +658,7 @@ for (let i = 0; i < 10; i++) {
     const wsUrlInput = document.getElementById('wsUrl');
     const userInput = document.getElementById('user');
     const reconnectTimeInput = document.getElementById('reconnectTime');
+    const serverStatusLink = document.getElementById('serverStatusLink');
     // Generate persistent connection ID once and store it
     function generatePersistentConnectionId() {
         if (!persistentConnectionId) {
@@ -792,11 +814,30 @@ for (let i = 0; i < 10; i++) {
             logActivity(`Failed to send code to IDE: ${error.message}`, 'error');
         }
     });
+
+    // Update server status link based on WebSocket URL
+    function updateServerStatusLink() {
+        const wsUrl = wsUrlInput.value.trim();
+        if (wsUrl) {
+            // Replace WebSocket protocol with HTTP and /ws with /status
+            let statusUrl = wsUrl.replace('/ws', '/status');
+            statusUrl = statusUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+            serverStatusLink.href = statusUrl;
+        }
+    }
+
+    // Update server status link when WebSocket URL changes
+    wsUrlInput.addEventListener('input', updateServerStatusLink);
+
     $(document).ready(function() {
         generatePersistentConnectionId();
         updateBrowserServerStatus(false);
         updateServerDesktopStatus(false);
         updateSessionStatus('ready', 'Click "Open Edit Demo" to start');
+
+        // Update server status link based on WebSocket URL
+        updateServerStatusLink();
+
         logActivity('jQuery demo page loaded. Configure settings and click "Open Edit Demo"!', 'info');
     });
     </script>
