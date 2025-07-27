@@ -252,6 +252,61 @@
             background: #f8fafc;
         }
 
+        .minimal-code-section {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .minimal-code-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f3f4f6;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .minimal-code-description {
+            color: #d1d5db;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .code-block {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #f3f4f6;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+        }
+
+        .code-comment {
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .code-keyword {
+            color: #fbbf24;
+        }
+
+        .code-string {
+            color: #34d399;
+        }
+
+        .code-function {
+            color: #60a5fa;
+        }
+
         .footer {
             text-align: center;
             margin-top: 2rem;
@@ -308,8 +363,34 @@
         <div class="intro-section">
             <h2 class="intro-title">🎯 Demo Overview</h2>
             <p class="intro-description">
-                Both demo pages simulate a web application where users open an edit screen to modify application logic. 
-                They showcase two different integration approaches for adding "Edit in IDE" functionality to your web applications.
+                Below you'll find the minimal integration code and two interactive demo pages that simulate web applications 
+                where users open an edit screen to modify application logic. They showcase different integration approaches 
+                for adding "Edit in IDE" functionality to your web applications.
+            </p>
+        </div>
+
+        <div class="minimal-code-section">
+            <h2 class="minimal-code-title">⚡ Minimal Integration</h2>
+            <p class="minimal-code-description">
+                You only need a few lines of JavaScript code to integrate Web-IDE-Bridge into your web application:
+            </p>
+
+            <pre class="code-block"><span class="code-comment">// 1. Initialize the library</span>
+<span class="code-keyword">const</span> userId = <span class="code-string">'jneutron'</span>; <span class="code-comment">// Unique user identifier</span>
+<span class="code-keyword">const</span> webIdeBridge = <span class="code-keyword">new</span> <span class="code-function">WebIdeBridge</span>(userId, {
+    serverUrl: <span class="code-string">'ws://localhost:8071/web-ide-bridge/ws'</span>,
+    addButtons: <span class="code-keyword">true</span>  <span class="code-comment">// Auto-inject buttons (default)</span>
+});
+
+<span class="code-comment">// 2. Connect to server</span>
+<span class="code-keyword">await</span> webIdeBridge.<span class="code-function">connect</span>();
+
+<span class="code-comment">// 3. Disconnect when done</span>
+webIdeBridge.<span class="code-function">disconnect</span>();</pre>
+
+            <p class="minimal-code-description">
+                <strong>That's it!</strong> With <code>addButtons: true</code>, the library automatically adds "Edit in IDE" buttons 
+                to all textarea elements and handles code synchronization. No additional HTML or CSS required.
             </p>
         </div>
 
