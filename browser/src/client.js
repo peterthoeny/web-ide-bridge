@@ -1,6 +1,9 @@
 import { generateUUID, validateServerUrl, debounce } from './utils.js';
 import { UIManager } from './ui.js';
 
+// Version from webpack DefinePlugin
+const VERSION = process.env.VERSION || '1.0.0';
+
 /**
  * Web-IDE-Bridge Client Library
  * Provides seamless integration between web applications and desktop IDEs
@@ -23,6 +26,7 @@ class WebIdeBridge {
       heartbeatInterval: 30000,
       connectionTimeout: 10000,
       debug: false,
+      addButtons: true,
       ...options
     };
 
@@ -35,6 +39,7 @@ class WebIdeBridge {
     this.ws = null;
     this.connected = false;
     this.connecting = false;
+    this.desktopConnected = false;
     this.reconnectAttempts = 0;
     this.reconnectTimeout = null;
     this.heartbeatTimeout = null;
@@ -83,7 +88,10 @@ class WebIdeBridge {
     }
 
     this.connecting = true;
-    this._updateStatus('connecting');
+    this._updateStatus({
+      serverConnected: false,
+      desktopConnected: false
+    });
 
     try {
       await this._establishConnection();
@@ -130,9 +138,10 @@ class WebIdeBridge {
    * Get current connection status
    */
   getConnectionState() {
-    if (this.connected) return 'connected';
-    if (this.connecting) return 'connecting';
-    return 'disconnected';
+    return {
+      serverConnected: this.connected,
+      desktopConnected: this.desktopConnected
+    };
   }
 
   /**
@@ -151,25 +160,20 @@ class WebIdeBridge {
       throw new Error('code must be a string');
     }
 
-    const sessionId = generateUUID();
-
     const message = {
       type: 'edit_request',
       connectionId: this.connectionId,
       userId: this.userId,
-      sessionId,
-      payload: {
-        textareaId,
-        code,
-        fileType: fileType || 'txt',
-        timestamp: Date.now()
-      }
+      snippetId: textareaId,
+      code,
+      fileType: fileType || 'txt',
+      timestamp: Date.now()
     };
 
-    this._log('Sending edit request', { textareaId, fileType, sessionId });
+    this._log('Sending edit request', { textareaId, fileType });
     this._sendMessage(message);
 
-    return sessionId;
+    return textareaId;
   }
 
   /**
@@ -182,7 +186,9 @@ class WebIdeBridge {
     this.statusCallbacks.push(callback);
 
     // Immediately call with current status
-    callback(this.getConnectionState());
+    const currentState = this.getConnectionState();
+    this._log('onStatusChange called immediately with state', currentState);
+    callback(currentState);
   }
 
   /**
@@ -291,6 +297,12 @@ class WebIdeBridge {
     this.connected = true;
     this.connecting = false;
 
+    // Update status first
+    this._updateStatus({
+      serverConnected: true,
+      desktopConnected: this.desktopConnected
+    });
+
     // Send browser connection message with our connectionId
     const connectMessage = {
       type: 'browser_connect',
@@ -299,9 +311,17 @@ class WebIdeBridge {
       timestamp: Date.now()
     };
 
-    this._sendMessage(connectMessage);
-    this._updateStatus('connected');
-    this._startHeartbeat();
+    try {
+      this._sendMessage(connectMessage);
+      this._startHeartbeat();
+
+      // Auto-inject buttons if enabled
+      if (this.options.addButtons) {
+        this.autoInjectButtons();
+      }
+    } catch (error) {
+      this._log('Error in connection open handler', error);
+    }
   }
 
   /**
@@ -313,7 +333,10 @@ class WebIdeBridge {
     this.connected = false;
     this.connecting = false;
     this._clearTimeouts();
-    this._updateStatus('disconnected');
+    this._updateStatus({
+      serverConnected: false,
+      desktopConnected: false
+    });
 
     // Attempt reconnection if enabled
     if (this.options.autoReconnect && event.code !== 1000) {
@@ -360,6 +383,10 @@ class WebIdeBridge {
           this._handleCodeUpdate(message);
           break;
 
+        case 'status_update':
+          this._handleStatusUpdate(message);
+          break;
+
         case 'pong':
           this._log('Received pong from server');
           break;
@@ -383,13 +410,16 @@ class WebIdeBridge {
    * Handle code update from IDE
    */
   _handleCodeUpdate(message) {
-    if (!message.payload || !message.payload.textareaId) {
-      this._log('Invalid code update message', message);
+    if (!message.snippetId || !message.code) {
+      this._log('Invalid code update message - missing snippetId or code', message);
       return;
     }
 
-    const { textareaId, code } = message.payload;
-    this._log('Received code update', { textareaId, codeLength: code.length });
+    const { snippetId, code } = message;
+    this._log('Received code update', { snippetId, codeLength: code.length });
+
+    // snippetId is the textareaId in the protocol
+    const textareaId = snippetId;
 
     // Trigger code update callbacks
     this.codeUpdateCallbacks.forEach(callback => {
@@ -398,6 +428,19 @@ class WebIdeBridge {
       } catch (error) {
         this._log('Error in code update callback', error);
       }
+    });
+  }
+
+  /**
+   * Handle status updates from server
+   */
+  _handleStatusUpdate(message) {
+    const desktopConnected = message.desktopConnected || false;
+    this._log('Status update from server', { desktopConnected });
+    this.desktopConnected = desktopConnected;
+    this._updateStatus({
+      serverConnected: this.connected,
+      desktopConnected: this.desktopConnected
     });
   }
 
@@ -527,9 +570,22 @@ class WebIdeBridge {
   _updateStatus(status) {
     this._log('Status changed to', status);
 
+    // Update internal state based on status
+    if (typeof status === 'string') {
+      // Legacy string status - update server connection
+      this.connected = status === 'connected';
+    } else if (typeof status === 'object') {
+      // New object status - update both server and desktop
+      this.connected = status.serverConnected || false;
+      this.desktopConnected = status.desktopConnected || false;
+    }
+
+    // Get current state and trigger callbacks
+    const currentState = this.getConnectionState();
+    this._log('Triggering status callbacks with state', currentState);
     this.statusCallbacks.forEach(callback => {
       try {
-        callback(status);
+        callback(currentState);
       } catch (error) {
         this._log('Error in status callback', error);
       }

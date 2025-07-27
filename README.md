@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.0.0
+# Web-IDE-Bridge v1.0.2
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.2-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -38,7 +38,8 @@ web-ide-bridge/
 ├── .babelrc                        # Babel configuration
 ├── .gitignore                      # Git ignore patterns
 ├── build.sh                        # Cross-platform build script
-├── version.js                      # Centralized version configuration
+├── server/version.js               # Server version configuration
+├── browser/version.js              # Browser version configuration
 ├── bump-version.js                 # Version bump automation script
 ├── developer_context.md            # Technical implementation guide (advanced)
 ├── browser/                        # Browser component
@@ -336,7 +337,8 @@ zip -r web-ide-bridge-macos-app.zip bin/darwin_amd64/Web-IDE-Bridge.app/  # macO
 Web-IDE-Bridge uses a centralized version management system:
 
 **📁 Version Files:**
-- `version.js` - JavaScript version configuration (used by server and browser)
+- `server/version.js` - Server version configuration
+- `browser/version.js` - Browser version configuration
 - `package.json` - Root version (used by desktop app via build flags)
 
 **🚀 Bumping Versions:**
@@ -356,6 +358,7 @@ node bump-version.js 1.0.1
 - Source files (server, browser, desktop)
 - Test files
 - Demo HTML files
+- Version files (server/version.js, browser/version.js)
 ```
 
 **Features:**

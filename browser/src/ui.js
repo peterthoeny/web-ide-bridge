@@ -22,12 +22,13 @@ export class UIManager {
       buttonText: 'Edit in IDE ↗',
       buttonClass: 'web-ide-bridge-btn',
       position: 'after', // 'after', 'before', 'append'
-      fileTypeAttribute: 'data-language',
+      fileTypeAttribute: 'data-type',
       defaultFileType: 'txt',
       excludeSelector: '.web-ide-bridge-exclude',
       includeOnlySelector: null,
       watchForChanges: true,
-      style: 'modern' // 'modern', 'minimal', 'custom'
+      style: 'modern', // 'modern', 'minimal', 'custom'
+      showFileTypeSelector: false // Disable file type selectors
     };
 
     const config = { ...defaultOptions, ...options };
@@ -111,11 +112,23 @@ export class UIManager {
    */
   updateButtonStates(connected) {
     this.injectedButtons.forEach(button => {
-      button.disabled = !connected;
-      button.textContent = connected ? 
-        button.dataset.originalText : 
-        'Connect to Server First';
+      this._updateButtonState(button);
     });
+  }
+
+  /**
+   * Update individual button state based on connection status
+   */
+  _updateButtonState(button) {
+    const isConnected = this.webIdeBridge.isConnected();
+    button.disabled = !isConnected;
+    if (isConnected) {
+      button.textContent = button.dataset.originalText || 'Edit in IDE ↗';
+      button.title = '';
+    } else {
+      button.textContent = 'Connect to Server First';
+      button.title = 'Web-IDE-Bridge server is not connected. Please open the edit demo and connect first.';
+    }
   }
 
   // Private methods
@@ -198,15 +211,6 @@ export class UIManager {
         align-items: center;
         margin-top: 0.5rem;
         flex-wrap: wrap;
-      }
-
-      .web-ide-bridge-file-type {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 0.875rem;
-        background: white;
-        color: #374151;
       }
     `;
   }
@@ -306,51 +310,9 @@ export class UIManager {
     button.dataset.textareaId = textarea.id;
     button.dataset.fileType = config.fileType;
     button.dataset.originalText = config.buttonText;
-    button.disabled = !this.webIdeBridge.isConnected();
 
-    // File type selector
-    const fileTypeSelect = document.createElement('select');
-    fileTypeSelect.className = 'web-ide-bridge-file-type';
-    fileTypeSelect.value = config.fileType;
-
-    // Common file types
-    const fileTypes = [
-      { value: 'txt', label: 'Text (.txt)' },
-      { value: 'js', label: 'JavaScript (.js)' },
-      { value: 'ts', label: 'TypeScript (.ts)' },
-      { value: 'jsx', label: 'React JSX (.jsx)' },
-      { value: 'tsx', label: 'React TSX (.tsx)' },
-      { value: 'css', label: 'CSS (.css)' },
-      { value: 'scss', label: 'SCSS (.scss)' },
-      { value: 'less', label: 'Less (.less)' },
-      { value: 'html', label: 'HTML (.html)' },
-      { value: 'xml', label: 'XML (.xml)' },
-      { value: 'json', label: 'JSON (.json)' },
-      { value: 'yaml', label: 'YAML (.yaml)' },
-      { value: 'py', label: 'Python (.py)' },
-      { value: 'java', label: 'Java (.java)' },
-      { value: 'cpp', label: 'C++ (.cpp)' },
-      { value: 'c', label: 'C (.c)' },
-      { value: 'php', label: 'PHP (.php)' },
-      { value: 'rb', label: 'Ruby (.rb)' },
-      { value: 'go', label: 'Go (.go)' },
-      { value: 'rs', label: 'Rust (.rs)' },
-      { value: 'sh', label: 'Shell (.sh)' },
-      { value: 'sql', label: 'SQL (.sql)' },
-      { value: 'md', label: 'Markdown (.md)' }
-    ];
-
-    fileTypes.forEach(type => {
-      const option = document.createElement('option');
-      option.value = type.value;
-      option.textContent = type.label;
-      fileTypeSelect.appendChild(option);
-    });
-
-    // Update button file type when selector changes
-    fileTypeSelect.addEventListener('change', () => {
-      button.dataset.fileType = fileTypeSelect.value;
-    });
+    // Set initial button state based on connection
+    this._updateButtonState(button);
 
     // Button click handler
     button.addEventListener('click', async () => {
@@ -370,7 +332,6 @@ export class UIManager {
     });
 
     container.appendChild(button);
-    container.appendChild(fileTypeSelect);
 
     // Position the container
     switch (config.position) {
@@ -391,7 +352,7 @@ export class UIManager {
 
     // Update button state based on connection
     this.webIdeBridge.onStatusChange((status) => {
-      this.updateButtonStates(status === 'connected');
+      this.updateButtonStates(status.serverConnected);
     });
 
     return button;

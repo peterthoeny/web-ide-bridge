@@ -1,7 +1,7 @@
-// Web-IDE-Bridge Version Configuration
-// Update this file to bump the version across the entire project
+// Web-IDE-Bridge Browser Version Configuration
+// Update this file to bump the version for the browser component
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.2';
 
 module.exports = {
   VERSION,
@@ -10,4 +10,4 @@ module.exports = {
   getVersionWithV: () => `v${VERSION}`,
   getVersionBadge: () => `![Version](https://img.shields.io/badge/version-${VERSION}-blue)`,
   getVersionShield: () => `https://img.shields.io/badge/version-${VERSION}-blue`
-}; 
+};

@@ -74,7 +74,7 @@ describe('Basic Server Functionality', () => {
       
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
-      expect(data.version).toBe('1.0.0');
+      expect(data.version).toBe('1.0.2');
     });
 
     test('should respond to status endpoint with JSON for API calls', async () => {
@@ -88,7 +88,7 @@ describe('Basic Server Functionality', () => {
       
       expect(response.status).toBe(200);
       expect(data.active).toBe(true);
-      expect(data.version).toBe('1.0.0');
+      expect(data.version).toBe('1.0.2');
       expect(data.connections).toBeDefined();
       expect(data.sessions).toBeDefined();
       expect(data.metrics).toBeDefined();

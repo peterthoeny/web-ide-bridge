@@ -30,12 +30,17 @@ console.log(`🚀 Bumping version to ${newVersion}...`);
 // Files to update with their patterns
 const filesToUpdate = [
   {
-    file: 'version.js',
+    file: 'server/version.js',
     patterns: [
       { from: /const VERSION = '[\d.]+'/, to: `const VERSION = '${newVersion}'` }
     ]
   },
-
+  {
+    file: 'browser/version.js',
+    patterns: [
+      { from: /const VERSION = '[\d.]+'/, to: `const VERSION = '${newVersion}'` }
+    ]
+  },
   {
     file: 'package.json',
     patterns: [
@@ -71,6 +76,19 @@ const filesToUpdate = [
     file: 'browser/web-ide-bridge.js',
     patterns: [
       { from: /\* Web-IDE-Bridge v[\d.]+/, to: `* Web-IDE-Bridge v${newVersion}` }
+    ]
+  },
+  {
+    file: 'browser/web-ide-bridge.min.js',
+    patterns: [
+      { from: /\* Web-IDE-Bridge v[\d.]+/, to: `* Web-IDE-Bridge v${newVersion}` },
+      { from: /^/, to: `/**
+ * Web-IDE-Bridge v${newVersion}
+ * Browser library for seamless IDE integration
+ * 
+ * This is the production build (minified).
+ */
+` }
     ]
   },
   {

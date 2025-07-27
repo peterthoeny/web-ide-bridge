@@ -10,7 +10,7 @@ const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { VERSION } = require('../version.js');
+const { VERSION } = require('./version.js');
 
 /**
  * Web-IDE-Bridge Server
@@ -270,7 +270,7 @@ class WebIdeBridgeServer {
     }
 
     // Validate message type
-    const validTypes = ['browser_connect', 'desktop_connect', 'edit_request', 'code_update', 'ping'];
+    const validTypes = ['browser_connect', 'desktop_connect', 'edit_request', 'code_update', 'ping', 'connection_init', 'info'];
     if (!validTypes.includes(message.type)) {
       return { valid: false, error: `Unknown message type: ${message.type}` };
     }
@@ -288,23 +288,17 @@ class WebIdeBridgeServer {
         break;
 
       case 'edit_request':
-        if (!message.userId || !message.payload) {
-          return { valid: false, error: 'edit_request requires userId and payload' };
+        if (!message.userId || !message.snippetId || !message.code) {
+          return { valid: false, error: 'edit_request requires userId, snippetId, and code' };
         }
-        if (!message.payload.snippetId || !message.payload.code) {
-          return { valid: false, error: 'edit_request payload requires snippetId and code' };
-        }
-        if (message.payload.code.length > 10 * 1024 * 1024) { // 10MB limit
+        if (message.code.length > 10 * 1024 * 1024) { // 10MB limit
           return { valid: false, error: 'Code payload too large (max 10MB)' };
         }
         break;
 
       case 'code_update':
-        if (!message.payload) {
-          return { valid: false, error: 'code_update requires payload' };
-        }
-        if (!message.payload.code) {
-          return { valid: false, error: 'code_update payload requires code field' };
+        if (!message.userId || !message.snippetId || !message.code) {
+          return { valid: false, error: 'code_update requires userId, snippetId, and code' };
         }
         break;
     }
@@ -683,10 +677,10 @@ class WebIdeBridgeServer {
    * Handle edit request from browser
    */
   handleEditRequest(ws, message) {
-    const { userId, payload } = message;
+    const { userId, snippetId, code, fileType } = message;
 
-    if (!userId || !payload) {
-      this.sendError(ws, 'Edit request requires userId and payload');
+    if (!userId || !snippetId || !code) {
+      this.sendError(ws, 'Edit request requires userId, snippetId, and code');
       return;
     }
 
@@ -703,11 +697,11 @@ class WebIdeBridgeServer {
       return;
     }
 
-    // In handleEditRequest, always update the session mapping for userId:snippetId
-    const sessionKey = userId + ':' + payload.snippetId;
+    // Store session mapping using snippetId as the key
+    const sessionKey = userId + ':' + snippetId;
     this.activeSessions.set(sessionKey, {
       userId,
-      snippetId: payload.snippetId,
+      snippetId: snippetId,
       browserConnectionId: ws.connectionId, // always update to latest browser connection
       desktopConnectionId: userSession.desktopId, // always update to latest desktop connection
       createdAt: Date.now(),
@@ -718,14 +712,17 @@ class WebIdeBridgeServer {
     // Forward to desktop
     this.sendMessage(desktopConn.ws, {
       type: 'edit_request',
-      payload
+      userId,
+      snippetId,
+      code,
+      fileType
     });
 
     // Add to activity log
-    this.addActivityLogEntry(`Edit request: ${userId} → ${payload.snippetId}`, 'info');
+    this.addActivityLogEntry(`Edit request: ${userId} → ${snippetId}`, 'info');
 
     if (this.config.debug) {
-      console.log(`Edit request: userId=${userId}, snippetId=${payload.snippetId}`);
+      console.log(`Edit request: userId=${userId}, snippetId=${snippetId}`);
     }
   }
 
@@ -733,14 +730,18 @@ class WebIdeBridgeServer {
    * Handle code update from desktop
    */
   handleCodeUpdate(ws, message) {
-    const { userId, payload } = message;
+    const { userId, snippetId, code, fileType } = message;
 
-    if (!userId || !payload) {
-      this.sendError(ws, 'code_update requires userId and payload');
+    if (!userId || !snippetId || !code) {
+      this.sendError(ws, 'code_update requires userId, snippetId, and code');
       return;
     }
 
-    const sessionKey = userId + ':' + payload.snippetId;
+    const sessionKey = userId + ':' + snippetId;
+    if (this.config.debug) {
+      console.log(`Looking for session with key: ${sessionKey}`);
+      console.log(`Available sessions:`, Array.from(this.activeSessions.keys()));
+    }
     const session = this.activeSessions.get(sessionKey);
     if (!session) {
       // Try to notify the desktop if possible
@@ -752,7 +753,7 @@ class WebIdeBridgeServer {
           this.sendMessage(desktopConn.ws, {
             type: 'info',
             payload: {
-              snippetId: payload.snippetId,
+              snippetId: snippetId,
               message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
             }
           });
@@ -790,10 +791,8 @@ class WebIdeBridgeServer {
     // Forward to browser
     this.sendMessage(browserConn.ws, {
       type: 'code_update',
-      payload: {
-        snippetId: session.snippetId,
-        code: payload.code
-      }
+      snippetId: session.snippetId,
+      code: code
     });
 
     // Add to activity log

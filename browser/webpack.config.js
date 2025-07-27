@@ -1,18 +1,33 @@
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
+const { VERSION } = require('./version.js');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
   
   return {
     entry: './src/client.js',
+    plugins: [
+      new (require('webpack')).DefinePlugin({
+        'process.env.VERSION': JSON.stringify(VERSION)
+      }),
+      new (require('webpack')).BannerPlugin({
+        banner: `/**
+ * Web-IDE-Bridge v${VERSION}
+ * Browser library for seamless IDE integration
+ * 
+ * ${isProduction ? 'This is the production build (minified).' : 'This is the development build with full debugging support.'}
+ */`,
+        raw: true,
+        entryOnly: true
+      })
+    ],
     output: {
       path: path.resolve(__dirname),
-      filename: isProduction ? 'web-ide-bridge.min.js' : 'web-ide-bridge.js',
+      filename: isProduction ? 'web-ide-bridge.min.js' : 'web-ide-bridge-built.js',
       library: 'WebIdeBridge',
-      libraryTarget: 'umd',
+      libraryTarget: 'var',
       libraryExport: 'default',
-      globalObject: 'this',
       clean: false // Don't clean the entire directory
     },
     module: {
@@ -38,22 +53,22 @@ module.exports = (env, argv) => {
     },
     optimization: {
       minimize: isProduction,
-      minimizer: [
+      minimizer: isProduction ? [
         new TerserPlugin({
           terserOptions: {
             compress: {
-              drop_console: isProduction,
-              drop_debugger: isProduction
+              drop_console: true,
+              drop_debugger: true
             },
             format: {
-              comments: false
+              comments: /^\/\* Web-IDE-Bridge/
             }
           },
           extractComments: false
         })
-      ]
+      ] : []
     },
-    devtool: isProduction ? 'source-map' : 'eval-source-map',
+    devtool: isProduction ? 'source-map' : 'source-map',
     devServer: {
       static: {
         directory: path.join(__dirname),

@@ -4,6 +4,7 @@ import { UIManager } from '../../browser/src/ui.js';
 class MockWebIdeBridge {
   constructor() {
     this.connected = false;
+    this.statusCallbacks = [];
   }
 
   editCodeSnippet(textareaId, code, fileType) {
@@ -12,6 +13,15 @@ class MockWebIdeBridge {
 
   isConnected() {
     return this.connected;
+  }
+
+  onStatusChange(callback) {
+    this.statusCallbacks.push(callback);
+    // Immediately call with current status
+    callback({
+      serverConnected: this.connected,
+      desktopConnected: false
+    });
   }
 }
 

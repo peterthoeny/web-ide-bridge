@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge-browser",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Web-IDE-Bridge browser library for seamless IDE integration",
   "main": "web-ide-bridge.js",
   "module": "src/client.js",

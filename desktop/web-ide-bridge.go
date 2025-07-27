@@ -392,12 +392,11 @@ func (c *WebSocketClient) readLoop(pongCh chan struct{}) {
 		typeVal, _ := m["type"].(string)
 		if typeVal == "edit_request" {
 			c.log("Received edit_request")
-			payload, _ := m["payload"].(map[string]interface{})
-			snippetId, _ := payload["snippetId"].(string)
-			code, _ := payload["code"].(string)
-			fileType, _ := payload["fileType"].(string)
+			snippetId, _ := m["snippetId"].(string)
+			code, _ := m["code"].(string)
+			fileType, _ := m["fileType"].(string)
 			if snippetId != "" {
-				c.sessionMap[snippetId] = snippetId // Assuming snippetId is the sessionId for now
+				c.sessionMap[snippetId] = snippetId
 			}
 			go c.handleEditRequest(snippetId, code, fileType)
 		} else if typeVal == "status_update" {
@@ -543,23 +542,15 @@ func (c *WebSocketClient) stopAllWatchers() {
 
 // Send code update to server
 func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
-	sessionId := c.sessionMap[snippetId]
-	if sessionId == "" {
-		c.log("No sessionId found for snippetId: " + snippetId + ", not sending code_update")
-		return
-	}
 	c.log("[sendCodeUpdate] userId=" + c.cfg.UserID + ", snippetId=" + snippetId + ", fileType=" + fileType)
 	msg := map[string]interface{}{
 		"type":         "code_update",
 		"connectionId": c.cfg.ConnectionID,
 		"userId":       c.cfg.UserID,
-		"sessionId":    sessionId,
-		"payload": map[string]interface{}{
-			"snippetId": snippetId,
-			"code":      code,
-			"fileType":  fileType,
-			"timestamp": time.Now().UnixMilli(),
-		},
+		"snippetId":    snippetId,
+		"code":         code,
+		"fileType":     fileType,
+		"timestamp":    time.Now().UnixMilli(),
 	}
 	data, _ := json.Marshal(msg)
 	if c.conn != nil {
