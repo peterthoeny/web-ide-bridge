@@ -298,17 +298,19 @@ go run web-ide-bridge.go
 # Build for all platforms (recommended)
 ./build.sh
 
-# Or build for your current platform only
-cd desktop
-go build -ldflags "-X main.Version=$(node -p "require('../package.json').version")" -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
-
 # Or run directly (development)
 cd desktop
 go run web-ide-bridge.go
 
+# Or build for your current platform only
+cd desktop
+go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
+# Note: on Windows add this before the -o flag: -ldflags "-H=windowsgui"
+
 # Or build for a specific platform
 cd desktop
-GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=$(node -p "require('../package.json').version")" -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
+GOOS=darwin GOARCH=amd64 go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
+GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
 
 # The app will automatically use platform-specific icons from the assets/ directory
 ```
