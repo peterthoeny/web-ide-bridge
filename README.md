@@ -79,11 +79,9 @@ web-ide-bridge/
     ├── setup.js                        # Global test configuration
     ├── run-server-tests.js             # Standalone server test runner
     ├── browser/                        # Browser library tests
-    │   ├── jest.config.js                  # Browser-specific Jest config
     │   ├── utils.test.js                   # Unit tests for browser utils
     │   ├── ui.test.js                      # Unit tests for browser UI
     │   ├── client.test.js                  # Unit tests for browser client
-    │   ├── simple.test.js                  # Basic Jest sanity check
     │   └── built-library.test.js           # Tests for built UMD library
     ├── desktop/                        # Desktop app tests
     │   └── desktop_test.go                   # Comprehensive desktop test suite
@@ -187,7 +185,7 @@ npm start -- --config /path/to/config.conf
 
 ### 3. Run Tests
 
-**⚠️ Important Note:** Jest server tests have known hanging issues. Use the recommended test approaches below for reliable testing.
+
 
 #### **Recommended Test Commands:**
 
@@ -206,30 +204,15 @@ npm run test:quick && \
 npm run test:desktop
 ```
 
-#### **Alternative Test Commands (May Hang):**
+#### **Desktop Tests (Go):**
 
 ```bash
-# ⚠️ Jest Server Tests (Known Issues)
-npm test -- tests/server/          # May hang due to Jest environment conflicts
-
-# ⚠️ Jest Browser Tests (Partial)
-cd tests/browser && npx jest --config jest.config.js  # 52/103 tests passing
-
-# ⚠️ All Jest Tests
-npm test                           # May hang on server tests
-
 # ✅ Desktop Tests (Go)
 npm run test:desktop                          # Using npm script (10/10 tests passing)
 # Or manually:
 cd desktop
 go test -v ../tests/desktop/desktop_test.go  # All desktop tests (10/10 passing)
 cd ..
-
-# Debug test runs
-DEBUG_TESTS=true npm test
-
-# Test with coverage
-npm test -- --coverage
 ```
 
 #### **Test Status Summary:**
@@ -258,13 +241,22 @@ npm test -- --coverage
 - ✅ **End-to-End:** Complete user workflows and multi-user scenarios
 - ✅ **Browser Library:** Built UMD library testing with dynamic loading
 
-#### **Known Issues:**
-- ❌ **Jest Server Tests:** Hanging due to WebSocket lifecycle conflicts
-- ⚠️ **Browser Component Tests:** Implementation differences (non-critical)
-- ⚠️ **Jest Environment:** Event loop conflicts with WebSocket testing
-- ⚠️ **Desktop Test Runners:** Shell and Node.js scripts expect separate test files (use `npm run test:desktop` instead)
+#### **Test Coverage Areas (Working Tests):**
+- ✅ **Server Core:** Creation, startup, shutdown, configuration
+- ✅ **WebSocket Communication:** Connection, messaging, error handling
+- ✅ **HTTP Endpoints:** Health, status, debug endpoints
+- ✅ **Session Management:** User sessions, cleanup, validation
+- ✅ **Desktop Configuration:** Save/load, app config management
+- ✅ **Desktop WebSocket Client:** Connection, status management, logging
+- ✅ **Desktop File Watcher:** File monitoring, add/remove operations
+- ✅ **Desktop Integration:** Edit request workflows, IDE integration
+- ✅ **Unit Tests:** Core functionality, validation, configuration
+- ✅ **Integration Tests:** WebSocket communication, session management
+- ✅ **Performance Tests:** Load testing, memory usage, response times
+- ✅ **Edge Cases:** Error handling, connection failures, malformed data
+- ✅ **End-to-End:** Complete user workflows and multi-user scenarios
 
-**💡 Recommendation:** Use the standalone server tests for development and CI/CD. They provide better reliability and comprehensive coverage than Jest server tests.
+**💡 Recommendation:** Use the standalone server tests for development and CI/CD. They provide excellent reliability and comprehensive coverage.
 
 ### 4. Install Desktop Application
 
@@ -849,7 +841,6 @@ curl http://localhost:8071/web-ide-bridge/debug
 
 ### Test Documentation
 - **[TEST_STATUS.md](TEST_STATUS.md)**: Current test status, working tests, and recommendations
-- **[JEST_SERVER_FIX.md](JEST_SERVER_FIX.md)**: Analysis of Jest server test issues and solutions
 
 ### Development Guides
 - **[developer_context.md](developer_context.md)**: **Technical implementation guide** - Detailed architecture, protocol specifications, security considerations, performance optimization, error handling patterns, and production deployment guidance for contributors and advanced users
