@@ -446,7 +446,7 @@
         <div class="header">
             <img src="assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
             <span class="title">Web-IDE-Bridge jQuery Demo</span>
-            <span class="version">v1.0.3</span>
+            <span class="version">v1.0.4</span>
         </div>
         <p class="subtitle">Custom UI integration using jQuery and Web-IDE-Bridge</p>
         <!-- (Copy the rest of the HTML structure from demo.html, but do NOT include any auto-injected buttons) -->
@@ -614,7 +614,7 @@ for (let i = 0; i < 10; i++) {
             </p>
         </div>
     </div>
-    <script src="web-ide-bridge-built.js"></script>
+    <script src="web-ide-bridge.js"></script>
     <script>
     // jQuery-based demo logic for Web-IDE-Bridge
     let webIdeBridge = null;
@@ -734,22 +734,16 @@ for (let i = 0; i < 10; i++) {
                         logActivity(`Code updated for ${snippetId}`, 'success');
                         textarea.dispatchEvent(new Event('input', { bubbles: true }));
                     }
-                    // Send info message back to server on successful update
-                    if (webIdeBridge && webIdeBridge.isConnected()) {
-                        webIdeBridge._sendMessage({
-                            type: 'info',
-                            connectionId: webIdeBridge.connectionId,
-                            userId: webIdeBridge.userId,
-                            payload: {
-                                snippetId,
-                                message: `Code has been updated in web editor field ${snippetId}`
-                            }
-                        });
-                    }
+                    // Return a message that will be automatically sent to the desktop
+                    return `Code has been updated in web editor field ${snippetId}`;
                 });
                 webIdeBridge.onError((error) => {
                     logActivity(`Error: ${error}`, 'error');
                     updateSessionStatus('error', error);
+                });
+
+                webIdeBridge.onMessage((message) => {
+                    logActivity(`Message received: ${message.type}`, 'info');
                 });
             }
             updateBrowserServerStatus(false);

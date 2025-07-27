@@ -1,7 +1,7 @@
 // Web-IDE-Bridge Browser Version Configuration
 // Update this file to bump the version for the browser component
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 
 module.exports = {
   VERSION,

@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Bridge web applications to desktop IDEs for seamless code editing",
   "private": true,
   "workspaces": [
@@ -9,25 +9,16 @@
     "desktop"
   ],
   "scripts": {
-    "test": "jest",
-    "test:server": "jest tests/server",
-    "test:browser": "jest tests/browser",
-    "test:desktop": "cd desktop && go test -v ../tests/desktop/desktop_test.go", 
-    "test:e2e": "jest tests/e2e",
-    "test:performance": "jest tests/server/performance.test.js",
-    "test:edge-cases": "jest tests/server/edge-cases.test.js",
     "test:server-standalone": "node tests/run-server-tests.js",
     "test:quick": "node tests/server/quick-test.js",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --coverage --watchAll=false --verbose",
+    "test:desktop": "cd desktop && go test -v ../tests/desktop/desktop_test.go",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "dev:server": "cd server && npm run dev",
     "start:server": "cd server && npm start",
     "build": "npm run build:server && npm run build:browser && npm run build:desktop",
     "build:server": "cd server && npm run build",
-    "build:browser": "cd browser && npm run build", 
+    "build:browser": "cd browser && npm run build",
     "build:desktop": "cd desktop && npm run build"
   },
   "repository": {
@@ -36,7 +27,7 @@
   },
   "keywords": [
     "ide",
-    "bridge", 
+    "bridge",
     "websocket",
     "code-editor",
     "desktop",
@@ -48,15 +39,10 @@
     "url": "https://github.com/peterthoeny/web-ide-bridge/issues"
   },
   "homepage": "https://github.com/peterthoeny/web-ide-bridge#readme",
-  "dependencies": {
-  },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "eslint": "^8.51.0",
-    "eslint-config-node": "^4.1.0",
-    "babel-jest": "^29.7.0",
     "@babel/core": "^7.23.2",
-    "@babel/preset-env": "^7.23.2"
+    "@babel/preset-env": "^7.23.2",
+    "eslint": "^8.51.0",
+    "eslint-config-node": "^4.1.0"
   }
-
 }

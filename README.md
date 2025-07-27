@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.0.3
+# Web-IDE-Bridge v1.0.4
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.3-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.4-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -34,8 +34,7 @@ web-ide-bridge/
 ├── LICENSE                         # GPL v3 license file
 ├── package.json                    # Root package configuration
 ├── package-lock.json               # Locked dependencies
-├── jest.config.js                  # Jest test configuration
-├── .babelrc                        # Babel configuration
+
 ├── .gitignore                      # Git ignore patterns
 ├── build.sh                        # Cross-platform build script
 ├── server/version.js               # Server version configuration
@@ -45,19 +44,12 @@ web-ide-bridge/
 ├── browser/                        # Browser component
 │   ├── demo.html                       # Demo page with textarea forms
 │   ├── jquery-demo.html                # jQuery-based custom UI demo
-│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (dev)
+│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (development)
 │   ├── web-ide-bridge.min.js           # Minified production version
-│   ├── web-ide-bridge.min.js.map       # Source map for minified version
 │   ├── package.json                    # Browser package configuration
-│   ├── webpack.config.js               # Build configuration
-│   ├── .babelrc                        # Browser-specific Babel config
-│   ├── assets/                         # Demo assets
-│   │   ├── web-ide-bridge-24.png       # 24x24 icon for demo pages
-│   │   └── favicon.ico                 # Favicon for demo pages
-│   └── src/
-│       ├── client.js                   # Main client implementation
-│       ├── ui.js                       # UI components and styling
-│       └── utils.js                    # Utility functions
+│   └── assets/                         # Demo assets
+│       ├── web-ide-bridge-24.png       # 24x24 icon for demo pages
+│       └── favicon.ico                 # Favicon for demo pages
 ├── bin/                           # Build outputs (cross-platform)
 │   ├── darwin_amd64/                  # macOS Intel builds
 │   ├── darwin_arm64/                  # macOS Apple Silicon builds
@@ -206,15 +198,12 @@ npm install  # Install test dependencies
 # ✅ Manual Test All Components (Run each command separately)
 npm run test:server-standalone      # Test server
 npm run test:quick                  # Quick server check
-npm test -- tests/server/simple-import.test.js  # Simple import tests
 npm run test:desktop                # Test desktop
-cd tests/browser && npx jest --config jest.config.js simple.test.js # Test browser
 
 # ✅ All Working Tests (CI/CD)
 npm run test:server-standalone && \
 npm run test:quick && \
-npm run test:desktop && \
-cd tests/browser && npx jest --config jest.config.js simple.test.js
+npm run test:desktop
 ```
 
 #### **Alternative Test Commands (May Hang):**
@@ -248,10 +237,7 @@ npm test -- --coverage
 | Test Type | Status | Passing | Total | Success Rate | Recommendation |
 |-----------|--------|---------|-------|--------------|----------------|
 | **Server (Standalone)** | ✅ **EXCELLENT** | 7 | 7 | 100% | **Use this** |
-| **Server (Jest)** | ❌ **BROKEN** | 0 | 0 | 0% | Avoid |
 | **Quick Test** | ✅ **WORKING** | 1 | 1 | 100% | **Use this** |
-| **Browser Basic** | ✅ **WORKING** | 3 | 3 | 100% | **Use this** |
-| **Browser Component** | ⚠️ **PARTIAL** | 52 | 103 | 50% | Optional |
 | **Desktop (Go)** | ✅ **EXCELLENT** | 10 | 10 | 100% | **Use this** |
 
 #### **Test Coverage Areas (Working Tests):**
@@ -391,11 +377,29 @@ open browser/jquery-demo.html   # Custom UI integration demo
 - 📊 **Status Monitoring**: Live connection status and activity logs
 - 🎯 **Custom Integration**: jQuery demo shows manual button creation
 
-### 6. Integrate into Web Application
+### 6. Build Browser Library
+
+The browser library uses a single source file approach for simplicity:
+
+```bash
+# Development: Use web-ide-bridge.js directly (no build needed)
+# Production build (minified)
+cd browser
+npm run build
+```
+
+**File Structure:**
+- **Development**: `web-ide-bridge.js` - Single source file (use directly)
+- **Production**: `web-ide-bridge.min.js` - Minified version for production
+
+### 7. Integrate into Web Application
 
 ```html
 <!-- Include the JavaScript library -->
-<script src="/path/to/web-ide-bridge/web-ide-bridge.min.js"></script>
+<!-- For development: -->
+<script src="/path/to/web-ide-bridge/web-ide-bridge.js"></script>
+<!-- For production: -->
+<!-- <script src="/path/to/web-ide-bridge/web-ide-bridge.min.js"></script> -->
 
 <script>
 // Initialize Web-IDE-Bridge (default: addButtons: true)
@@ -431,7 +435,7 @@ webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
 </script>
 ```
 
-### 7. Usage Workflow
+### 8. Usage Workflow
 
 1. **🚀 Start Components**
    - Launch Web-IDE-Bridge server: `npm start` in server directory

@@ -793,17 +793,17 @@ class WebIdeBridgeServer {
       return;
     }
 
-    // Forward to all browser connections for this user
+    // Forward to the browser connection that initiated this edit session
     let delivered = false;
+    const targetBrowserId = session.browserConnectionId;
+
     if (this.config.debug) {
-      console.log(`Attempting to deliver code update to ${userSession.browserIds.size} browser connections`);
+      console.log(`Looking for target browser connection: ${targetBrowserId}`);
+      console.log(`Available browser connections:`, Array.from(userSession.browserIds));
     }
 
-    userSession.browserIds.forEach(browserId => {
-      const browserConn = this.browserConnections.get(browserId);
-      if (this.config.debug) {
-        console.log(`Browser connection ${browserId}:`, browserConn ? 'found' : 'not found');
-      }
+    if (targetBrowserId && userSession.browserIds.has(targetBrowserId)) {
+      const browserConn = this.browserConnections.get(targetBrowserId);
       if (browserConn) {
         this.sendMessage(browserConn.ws, {
           type: 'code_update',
@@ -812,22 +812,38 @@ class WebIdeBridgeServer {
         });
         delivered = true;
         if (this.config.debug) {
-          console.log(`Code update delivered to browser ${browserId}`);
+          console.log(`Code update delivered to target browser ${targetBrowserId}`);
+        }
+      } else {
+        if (this.config.debug) {
+          console.log(`Target browser connection ${targetBrowserId} not found`);
         }
       }
-    });
+    } else {
+      if (this.config.debug) {
+        console.log(`Target browser ${targetBrowserId} not in user's browser connections`);
+      }
+    }
 
+    // If not delivered, notify desktop
     if (!delivered) {
-      // Send info message to desktop if no browser connections were available
       const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
       if (desktopConn) {
+        const message = targetBrowserId 
+          ? 'Error: The browser that initiated this edit session is no longer connected. Please refresh the web application.'
+          : 'Error: No active browser connections. Make sure the web application is open and connected.';
+
         this.sendMessage(desktopConn.ws, {
           type: 'info',
           payload: {
             snippetId: session.snippetId,
-            message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+            message: message
           }
         });
+
+        if (this.config.debug) {
+          console.log(`Notified desktop: ${message}`);
+        }
       }
     }
 

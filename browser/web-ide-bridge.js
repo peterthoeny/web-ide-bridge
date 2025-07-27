@@ -1,5 +1,5 @@
 /**
- * Web-IDE-Bridge v1.0.3
+ * Web-IDE-Bridge v1.0.4
  * Browser library for seamless IDE integration
  * 
  * This is the development build with full debugging support.
@@ -510,12 +510,10 @@
         type: 'edit_request',
         connectionId: this.connectionId,
         userId: this.userId,
-        payload: {
-          snippetId,
-          code,
-          fileType: fileType || 'txt',
-          timestamp: Date.now()
-        }
+        snippetId,
+        code,
+        fileType: fileType || 'txt',
+        timestamp: Date.now()
       };
 
       this._log('Sending edit request', { snippetId, fileType });
@@ -560,6 +558,13 @@
         throw new Error('Callback must be a function');
       }
       this.errorCallbacks.push(callback);
+    }
+
+    onMessage(callback) {
+      if (typeof callback !== 'function') {
+        throw new Error('Callback must be a function');
+      }
+      this.messageCallbacks.push(callback);
     }
 
     autoInjectButtons(options = {}) {
@@ -710,32 +715,44 @@
     }
 
     _handleCodeUpdate(message) {
-      if (!message.payload || !message.payload.snippetId) {
+      // Server sends flattened format (no payload wrapper)
+      if (!message.snippetId || !message.code) {
         this._log('Invalid code update message', message);
         return;
       }
 
-      const { snippetId, code } = message.payload;
+      const { snippetId, code } = message;
       this._log('Received code update', { snippetId, codeLength: code.length });
+      this._log('Number of code update callbacks:', this.codeUpdateCallbacks.length);
 
+      let callbackExecuted = false;
       this.codeUpdateCallbacks.forEach(callback => {
         try {
+          callbackExecuted = true;
           const result = callback(snippetId, code);
+          this._log('Callback result:', { result, type: typeof result, hasContent: result?.trim() });
           if (typeof result === 'string' && result.trim()) {
             // Send info message to server
+            this._log('Sending info message from callback result');
             this._sendMessage({
               type: 'info',
               connectionId: this.connectionId,
               userId: this.userId,
-              payload: { snippetId, message: result }
+              payload: { snippetId, message: result.trim() }
             });
           }
         } catch (error) {
           this._log('Error in code update callback', error);
         }
       });
+
+      if (!callbackExecuted) {
+        this._log('No callbacks executed for snippet:', snippetId);
+      }
+
       // If addButtons is true, send info message to server
       if (this.options.addButtons !== false) {
+        this._log('Sending default info message (addButtons mode)');
         this._sendMessage({
           type: 'info',
           connectionId: this.connectionId,

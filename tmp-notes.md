@@ -672,3 +672,36 @@ desktop/web-ide-bridge.go
 - show info message in activity log (or more prominently somewhere else?)
 
 ------------------------------
+
+small change in version management. the central version.js is not convenient because in vertain deployments the server/, browser/, desktop/ dirs will be in different locations and/or machines.
+
+- move version.js to server/ and browser
+- fix bump-version.js accordingly
+- fix README, developers_context if needed
+- fix tests if needed
+
+------------------------------
+
+review and fix developer_context.md, payload is gone.
+
+also, I did a ./build.sh, and open bin/darwin_amd64/Web-IDE-Bridge.app/
+
+the app starts, I can send snippets to the ide, but save abck does not work
+
+Ah, I see the issue:
+- I opened up both demo and jquery demo
+- both work for roundtrip
+- I closed demo
+- i send snippet from opem jquery-demo, it opens up in ide
+- fails to save back, desptop sees Server<=>Browser disconnected, which is true for demo, but not fr jquery demo
+
+we need to rethink this scenario.
+- desktop sends updated snippets back to server, regardless of reported Server<=>Browser status, the server will do the right thing (reject or forward)
+- question how to send Server<=>Browser status to desktop for a user, a user can have several Server<=>Browser connections.
+- possibly this? the server sends Server<=>Browser connected status to desktop when 1+ user specific Server<=>Browser connections are open, and disconnected when no Server<=>Browser are open
+
+------------------------------
+
+------------------------------
+
+

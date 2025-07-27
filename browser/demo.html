@@ -414,7 +414,7 @@
         <div class="header">
             <img src="assets/web-ide-bridge-24.png" alt="Web-IDE-Bridge" class="header-icon">
             <span class="title">Web-IDE-Bridge Demo</span>
-            <span class="version">v1.0.3</span>
+            <span class="version">v1.0.4</span>
         </div>
         <p class="subtitle">Experience seamless code editing between web applications and desktop IDEs</p>
 
@@ -596,8 +596,8 @@ for (let i = 0; i < 10; i++) {
         </div>
     </div>
 
-    <!-- Include the Web-IDE-Bridge library -->
-    <script src="web-ide-bridge-built.js"></script>
+            <!-- Include the Web-IDE-Bridge library -->
+        <script src="web-ide-bridge.js"></script>
 
     <script>
         // Global variables
@@ -754,6 +754,10 @@ for (let i = 0; i < 10; i++) {
                     webIdeBridge.onError((error) => {
                         logActivity(`Error: ${error}`, 'error');
                         updateSessionStatus('error', error);
+                    });
+
+                    webIdeBridge.onMessage((message) => {
+                        logActivity(`Message received: ${message.type}`, 'info');
                     });
                 }
 
