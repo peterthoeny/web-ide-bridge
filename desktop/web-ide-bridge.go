@@ -432,7 +432,7 @@ func (c *WebSocketClient) handleEditRequest(snippetId, code, fileType string) {
 	}
 	sanitizedId := sanitizeSnippetId(snippetId)
 	tmpFile := filepath.Join(tmpDir, "web-"+sanitizedId+"."+fileType)
-	c.log("[handleEditRequest] userId=" + c.cfg.UserID + ", snippetId=" + snippetId + ", fileType=" + fileType)
+	c.log(fmt.Sprintf("[handleEditRequest] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code)))
 	c.log("Saving code to temp file: " + tmpFile)
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
 		c.log("Failed to write temp file: " + err.Error())
@@ -542,7 +542,7 @@ func (c *WebSocketClient) stopAllWatchers() {
 
 // Send code update to server
 func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
-	c.log("[sendCodeUpdate] userId=" + c.cfg.UserID + ", snippetId=" + snippetId + ", fileType=" + fileType)
+	c.log(fmt.Sprintf("[sendCodeUpdate] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code)))
 	msg := map[string]interface{}{
 		"type":         "code_update",
 		"connectionId": c.cfg.ConnectionID,
@@ -574,6 +574,21 @@ func (c *WebSocketClient) setStatus(status string) {
 	select {
 	case c.statusCh <- status:
 	default:
+	}
+}
+
+// Smart logging helper for large messages
+func (c *WebSocketClient) smartLog(msg string, data interface{}) {
+	if data != nil {
+		// If data is a string and it's long, truncate it
+		if str, ok := data.(string); ok && len(str) > 100 {
+			truncated := str[:100] + "..." + str[len(str)-20:] + fmt.Sprintf(" (%d chars total)", len(str))
+			c.log(msg + ": " + truncated)
+		} else {
+			c.log(msg + ": " + fmt.Sprintf("%v", data))
+		}
+	} else {
+		c.log(msg)
 	}
 }
 
