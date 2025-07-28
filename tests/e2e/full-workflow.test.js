@@ -172,7 +172,7 @@ describe('End-to-End Workflow Tests', () => {
       }));
 
       const error = await browserClient.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('No desktop connection found');
+      expect(error.message).toContain('No desktop connection found');
 
       await cleanup();
     });
@@ -260,7 +260,7 @@ describe('End-to-End Workflow Tests', () => {
       browserClient.send({ invalid: 'message', missing: 'required fields' });
 
       const error = await browserClient.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('missing type');
+      expect(error.message).toContain('missing type');
 
       await cleanup();
     });

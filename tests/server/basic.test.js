@@ -74,7 +74,7 @@ describe('Basic Server Functionality', () => {
       
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
-      expect(data.version).toBe('1.0.4');
+      expect(data.version).toBe('1.1.0');
     });
 
     test('should respond to status endpoint with JSON for API calls', async () => {
@@ -88,7 +88,7 @@ describe('Basic Server Functionality', () => {
       
       expect(response.status).toBe(200);
       expect(data.active).toBe(true);
-      expect(data.version).toBe('1.0.4');
+      expect(data.version).toBe('1.1.0');
       expect(data.connections).toBeDefined();
       expect(data.sessions).toBeDefined();
       expect(data.metrics).toBeDefined();
@@ -116,7 +116,7 @@ describe('Basic Server Functionality', () => {
       client.ws.send('not json');
       
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Invalid JSON');
+      expect(error.message).toContain('Invalid JSON');
       
       await client.close();
     });
@@ -135,7 +135,7 @@ describe('Basic Server Functionality', () => {
       client.ws.send(JSON.stringify(invalidMessage));
       
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string type field');
+      expect(error.message).toContain('Message must have a string type field');
       
       await client.close();
     });
@@ -154,7 +154,7 @@ describe('Basic Server Functionality', () => {
       client.ws.send(JSON.stringify(invalidMessage));
       
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string connectionId field');
+      expect(error.message).toContain('Message must have a string connectionId field');
       
       await client.close();
     });

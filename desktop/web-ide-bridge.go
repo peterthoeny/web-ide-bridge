@@ -415,8 +415,7 @@ func (c *WebSocketClient) readLoop(pongCh chan struct{}) {
 				// Optionally, notify UI via a channel or callback
 			}
 		} else if typeVal == "info" {
-			payload, _ := m["payload"].(map[string]interface{})
-			message, _ := payload["message"].(string)
+			message, _ := m["message"].(string)
 			if message != "" {
 				c.log(message)
 			}

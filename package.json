@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Bridge web applications to desktop IDEs for seamless code editing",
   "private": true,
   "workspaces": [
@@ -12,6 +12,7 @@
     "test:server-standalone": "node tests/run-server-tests.js",
     "test:quick": "node tests/server/quick-test.js",
     "test:desktop": "cd desktop && go test -v ../tests/desktop/desktop_test.go",
+    "test:browser": "node tests/browser/simple-browser.test.js",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "dev:server": "cd server && npm run dev",
@@ -43,6 +44,7 @@
     "@babel/core": "^7.23.2",
     "@babel/preset-env": "^7.23.2",
     "eslint": "^8.51.0",
-    "eslint-config-node": "^4.1.0"
+    "eslint-config-node": "^4.1.0",
+    "jsdom": "^26.1.0"
   }
 }

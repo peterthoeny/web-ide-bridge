@@ -304,6 +304,12 @@ class WebIdeBridgeServer {
           return { valid: false, error: 'code_update requires userId, snippetId, and code' };
         }
         break;
+
+      case 'info':
+        if (!message.userId || !message.snippetId || !message.message) {
+          return { valid: false, error: 'info requires userId, snippetId, and message' };
+        }
+        break;
     }
 
     return { valid: true };
@@ -748,10 +754,8 @@ class WebIdeBridgeServer {
         if (desktopConn) {
           this.sendMessage(desktopConn.ws, {
             type: 'info',
-            payload: {
-              snippetId: snippetId,
-              message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
-            }
+            snippetId: snippetId,
+            message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
           });
         }
       }
@@ -778,10 +782,8 @@ class WebIdeBridgeServer {
       if (desktopConn) {
         this.sendMessage(desktopConn.ws, {
           type: 'info',
-          payload: {
-            snippetId: session.snippetId,
-            message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
-          }
+          snippetId: session.snippetId,
+          message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
         });
       }
       // Do not treat as error, just return
@@ -830,10 +832,8 @@ class WebIdeBridgeServer {
 
         this.sendMessage(desktopConn.ws, {
           type: 'info',
-          payload: {
-            snippetId: session.snippetId,
-            message: message
-          }
+          snippetId: session.snippetId,
+          message: message
         });
 
         if (this.config.debug) {
@@ -851,7 +851,7 @@ class WebIdeBridgeServer {
   handlePing(ws, message) {
     this.sendMessage(ws, {
       type: 'pong',
-      payload: message.payload || {},
+      ...(message.payload || {}),
       timestamp: Date.now()
     });
   }
@@ -860,8 +860,8 @@ class WebIdeBridgeServer {
    * Handle info message from browser
    */
   handleInfoMessage(ws, message) {
-    const { userId, payload } = message;
-    if (!userId || !payload || !payload.snippetId || !payload.message) return;
+    const { userId, snippetId, message: msg } = message;
+    if (!userId || !snippetId || !msg) return;
     // Find user's desktop connection
     const userSession = this.userSessions.get(userId);
     if (!userSession || !userSession.desktopId) return;
@@ -870,10 +870,8 @@ class WebIdeBridgeServer {
     // Forward info message to desktop
     this.sendMessage(desktopConn.ws, {
       type: 'info',
-      payload: {
-        snippetId: payload.snippetId,
-        message: payload.message
-      }
+      snippetId: snippetId,
+      message: msg
     });
   }
 
@@ -959,7 +957,8 @@ class WebIdeBridgeServer {
 
     this.sendMessage(ws, {
       type: 'error',
-      payload: { message, code }
+      message: message,
+      code: code
     });
   }
 

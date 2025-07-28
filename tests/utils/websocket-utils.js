@@ -1008,8 +1008,8 @@ async function performLoadTest(serverPort, options = {}) {
             
             await client.waitForMessage(msg => 
               msg.type === 'pong' && 
-              msg.payload.client === clientIndex && 
-              msg.payload.message === msgIndex,
+              msg.client === clientIndex && 
+              msg.message === msgIndex,
               timeout
             );
             

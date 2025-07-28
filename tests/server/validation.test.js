@@ -180,7 +180,7 @@ describe('Comprehensive Server Validation', () => {
       // The connection might be dropped due to oversized payload
       try {
         const error = await client.waitForMessage(msg => msg.type === 'error', 3000);
-        expect(error.payload.message).toContain('Code payload too large');
+        expect(error.message).toContain('Code payload too large');
       } catch (timeoutError) {
         // Connection might have been dropped, which is also acceptable behavior
         expect(client.connected).toBe(false);
@@ -298,7 +298,7 @@ describe('Comprehensive Server Validation', () => {
       });
       
       const error = await browserClient.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Unknown message type');
+      expect(error.message).toContain('Unknown message type');
       
       // Server should still be functional
       expect(server.server.listening).toBe(true);

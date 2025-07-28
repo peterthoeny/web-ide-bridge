@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.0.4
+# Web-IDE-Bridge v1.1.0
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.4-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -44,8 +44,11 @@ web-ide-bridge/
 ├── browser/                        # Browser component
 │   ├── demo.html                       # Demo page with textarea forms
 │   ├── jquery-demo.html                # jQuery-based custom UI demo
+│   ├── index.html                      # Additional demo page
 │   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (development)
 │   ├── web-ide-bridge.min.js           # Minified production version
+│   ├── web-ide-bridge.js.map           # Source map for development
+│   ├── web-ide-bridge.min.js.map       # Source map for production
 │   ├── package.json                    # Browser package configuration
 │   └── assets/                         # Demo assets
 │       ├── web-ide-bridge-24.png       # 24x24 icon for demo pages
@@ -76,12 +79,10 @@ web-ide-bridge/
 │       ├── web-ide-bridge-24.png           # 24x24 icon for status page
 │       └── favicon.ico                     # Favicon for status page
 └── tests/                          # Test infrastructure
-    ├── setup.js                        # Global test configuration
     ├── run-server-tests.js             # Standalone server test runner
     ├── browser/                        # Browser library tests
-    │   ├── utils.test.js                   # Unit tests for browser utils
-    │   ├── ui.test.js                      # Unit tests for browser UI
-    │   ├── client.test.js                  # Unit tests for browser client
+    │   ├── browser-test-runner.js          # Custom test runner (no Jest dependency)
+    │   ├── simple-browser.test.js          # Core browser library tests
     │   └── built-library.test.js           # Tests for built UMD library
     ├── desktop/                        # Desktop app tests
     │   └── desktop_test.go                   # Comprehensive desktop test suite
@@ -197,11 +198,13 @@ npm install  # Install test dependencies
 npm run test:server-standalone      # Test server
 npm run test:quick                  # Quick server check
 npm run test:desktop                # Test desktop
+npm run test:browser                # Test browser library
 
 # ✅ All Working Tests (CI/CD)
 npm run test:server-standalone && \
 npm run test:quick && \
-npm run test:desktop
+npm run test:desktop && \
+npm run test:browser
 ```
 
 #### **Desktop Tests (Go):**
@@ -222,6 +225,7 @@ cd ..
 | **Server (Standalone)** | ✅ **EXCELLENT** | 7 | 7 | 100% | **Use this** |
 | **Quick Test** | ✅ **WORKING** | 1 | 1 | 100% | **Use this** |
 | **Desktop (Go)** | ✅ **EXCELLENT** | 10 | 10 | 100% | **Use this** |
+| **Browser** | ✅ **EXCELLENT** | 6 | 6 | 100% | **Use this** |
 
 #### **Test Coverage Areas (Working Tests):**
 - ✅ **Server Core:** Creation, startup, shutdown, configuration

@@ -245,7 +245,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.ws.send('not an object');
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Invalid JSON');
+      expect(error.message).toContain('Invalid JSON');
 
       await client.close();
     });
@@ -261,7 +261,7 @@ describe('Server Edge Cases and Error Handling', () => {
       });
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string type field');
+      expect(error.message).toContain('Message must have a string type field');
 
       await client.close();
     });
@@ -278,7 +278,7 @@ describe('Server Edge Cases and Error Handling', () => {
       });
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string type field');
+      expect(error.message).toContain('Message must have a string type field');
 
       await client.close();
     });
@@ -296,7 +296,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(message);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Invalid connectionId');
+      expect(error.message).toContain('Invalid connectionId');
 
       await client.close();
     });
@@ -316,7 +316,7 @@ describe('Server Edge Cases and Error Handling', () => {
       }));
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string connectionId field');
+      expect(error.message).toContain('Message must have a string connectionId field');
 
       await client.close();
     });
@@ -333,7 +333,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(message);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Unknown message type: unknown_type');
+      expect(error.message).toContain('Unknown message type: unknown_type');
 
       await client.close();
     });
@@ -353,7 +353,7 @@ describe('Server Edge Cases and Error Handling', () => {
       }));
     
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('browser_connect requires userId field');
+      expect(error.message).toContain('browser_connect requires userId field');
     
       await client.close();
     });
@@ -371,7 +371,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(message);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('userId must be 255 characters or less');
+      expect(error.message).toContain('userId must be 255 characters or less');
 
       await client.close();
     });
@@ -403,7 +403,7 @@ describe('Server Edge Cases and Error Handling', () => {
     
       const error = await client.waitForMessage(msg => msg.type === 'error');
       // Server validates message structure first, then business logic
-      expect(error.payload.message).toContain('edit_request requires userId, sessionId, and payload');
+      expect(error.message).toContain('edit_request requires userId, snippetId, and code');
     
       await client.close();
     });
@@ -425,7 +425,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(message);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('edit_request payload requires snippetId and code');
+      expect(error.message).toContain('edit_request requires userId, snippetId, and code');
 
       await client.close();
     });
@@ -460,7 +460,7 @@ describe('Server Edge Cases and Error Handling', () => {
         // Either get an error message or connection drops
         try {
           const error = await client.waitForMessage(msg => msg.type === 'error', 2000);
-          expect(error.payload.message).toContain('Code payload too large');
+          expect(error.message).toContain('Code payload too large');
         } catch (timeoutError) {
           // Connection might have been dropped due to oversized payload
           expect(client.connected).toBe(false);
@@ -498,7 +498,7 @@ describe('Server Edge Cases and Error Handling', () => {
     
       const error = await client.waitForMessage(msg => msg.type === 'error');
       // Server validates message structure first
-      expect(error.payload.message).toContain('code_update requires sessionId and payload');
+      expect(error.message).toContain('code_update requires userId, snippetId, and code');
     
       await client.close();
     });
@@ -511,7 +511,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.ws.send('null');
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must be an object');
+      expect(error.message).toContain('Message must be an object');
 
       await client.close();
     });
@@ -539,7 +539,7 @@ describe('Server Edge Cases and Error Handling', () => {
       }));
 
       const error = await desktopClient.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Session not found');
+      expect(error.message).toContain('Session not found');
 
       await desktopClient.close();
     });
@@ -568,7 +568,7 @@ describe('Server Edge Cases and Error Handling', () => {
       }));
 
       const error = await browserClient.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('No desktop connection found');
+      expect(error.message).toContain('No desktop connection found');
 
       await browserClient.close();
     });
@@ -687,7 +687,7 @@ describe('Server Edge Cases and Error Handling', () => {
 
       const error = await desktopClient.waitForMessage(msg => msg.type === 'error');
       // The session gets cleaned up when browser disconnects
-      expect(error.payload.message).toContain('Session not found');
+      expect(error.message).toContain('Session not found');
 
       await desktopClient.close();
     });
@@ -702,7 +702,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send({});
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Message must have a string type field');
+      expect(error.message).toContain('Message must have a string type field');
 
       await client.close();
     });
@@ -1003,7 +1003,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.ws.send('{"invalid": json, "missing": quote}');
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Invalid JSON');
+      expect(error.message).toContain('Invalid JSON');
 
       // Connection should still be alive
       expect(client.connected).toBe(true);
@@ -1033,7 +1033,7 @@ describe('Server Edge Cases and Error Handling', () => {
       client.send(connectMessage);
 
       const error = await client.waitForMessage(msg => msg.type === 'error');
-      expect(error.payload.message).toContain('Error processing browser_connect');
+      expect(error.message).toContain('Error processing browser_connect');
 
       // Restore original handler
       server.handleBrowserConnect = originalHandleBrowserConnect;

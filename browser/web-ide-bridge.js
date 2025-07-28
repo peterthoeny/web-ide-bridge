@@ -1,5 +1,5 @@
 /**
- * Web-IDE-Bridge v1.0.4
+ * Web-IDE-Bridge v1.1.0
  * Browser library for seamless IDE integration
  * 
  * This is the development build with full debugging support.
@@ -725,7 +725,8 @@
               type: 'info',
               connectionId: this.connectionId,
               userId: this.userId,
-              payload: { snippetId, message: result.trim() }
+              snippetId: snippetId,
+              message: result.trim()
             });
           }
         } catch (error) {
@@ -744,16 +745,14 @@
           type: 'info',
           connectionId: this.connectionId,
           userId: this.userId,
-          payload: {
-            snippetId,
-            message: `Code snippet ${snippetId} has been updated in the web application`
-          }
+          snippetId: snippetId,
+          message: `Code snippet ${snippetId} has been updated in the web application`
         });
       }
     }
 
     _handleServerError(message) {
-      const errorMsg = message.payload?.message || 'Unknown server error';
+      const errorMsg = message.message || 'Unknown server error';
       this._log('Web-IDE-Bridge server error', errorMsg);
       this._triggerErrorCallbacks(errorMsg);
     }
