@@ -730,12 +730,7 @@ class WebIdeBridgeServer {
     });
 
     if (this.config.debug) {
-      // Include code snippet in debug mode
-      let processedCode = code.replace(/\r/g, '').replace(/\n/g, '\\n');
-      if (processedCode.length > 100) {
-        processedCode = `${processedCode.substring(0, 100)}...${processedCode.substring(processedCode.length - 20)}`;
-      }
-      this._log(`Browser edit request for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, codeLength: ${code.length}, code: '${processedCode}'`, 'info');
+      this._log(`Browser edit request for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, code: '%CODE%', codeLength: ${code.length}`, 'info', code);
     } else {
       this._log(`Browser edit request for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, codeLength: ${code.length}`, 'info');
     }
@@ -753,7 +748,11 @@ class WebIdeBridgeServer {
       return;
     }
 
-    this._log(null, 'info', { userId, snippetId, code, fileType });
+    if (this.config.debug) {
+      this._log(`Desktop code update for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, code: '%CODE%', codeLength: ${code.length}`, 'info', code);
+    } else {
+      this._log(`Desktop code update for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, codeLength: ${code.length}`, 'info');
+    }
 
     const sessionKey = userId + ':' + snippetId;
     if (this.config.debug) {
@@ -1840,39 +1839,25 @@ class WebIdeBridgeServer {
   /**
    * Unified logging function with optional activity log entry
    */
-  _log(message, type = null, data = null) {
+  _log(message, type = null, code = null) {
     const timestamp = this._getTimestamp();
 
-    // Handle code update data specially
-    if (data && typeof data === 'object' && data.code) {
-      let processedCode = data.code;
-
+    // Handle code string specially
+    if (typeof code === 'string' && code) {
       // Replace newlines with \n for single-line logging (handle both CRLF and LF)
-      processedCode = processedCode.replace(/\r/g, '').replace(/\n/g, '\\n');
+      code = code.replace(/\n/g, '\\n').replace(/[\x00-\x1F]/g, '');
 
       // Truncate if too long
-      if (processedCode.length > 120 && this.config.debug) {
-        processedCode = `${processedCode.substring(0, 100)}...${processedCode.substring(processedCode.length - 20)}`;
+      if (code.length > 120 && this.config.debug) {
+        code = `${code.substring(0, 100)}...${code.substring(code.length - 20)}`;
       }
+      message = message.replace(/%CODE%/, code);
+    }
+    console.log(`${timestamp}: ${message}`);
 
-      // Create detailed log for console and activity log
-      const logMessage = this.config.debug 
-        ? `Desktop code update for userId: ${data.userId || 'unknown'}, snippetId: ${data.snippetId || 'unknown'}, fileType: ${data.fileType || 'txt'}, code: '${processedCode}', codeLength: ${data.code.length}`
-        : `Desktop code update for userId: ${data.userId || 'unknown'}, snippetId: ${data.snippetId || 'unknown'}, fileType: ${data.fileType || 'txt'}, codeLength: ${data.code.length}`;
-      console.log(`${timestamp}: ${logMessage}`);
-
-      // Add to activity log if type is provided
-      if (type) {
-        this.addActivityLogEntry(timestamp, logMessage, type);
-      }
-    } else {
-      // Regular logging
-      console.log(`${timestamp}: ${message}`);
-
-      // Add to activity log if type is provided
-      if (type) {
-        this.addActivityLogEntry(timestamp, message, type);
-      }
+    // Add to activity log if type is provided
+    if (type) {
+      this.addActivityLogEntry(timestamp, message, type);
     }
   }
 
@@ -1882,7 +1867,15 @@ class WebIdeBridgeServer {
   addActivityLogEntry(timestamp, message, type = 'info') {
     const entry = {
       time: timestamp.replace(/^\d+[^ ]*/, ''),
-      message,
+      message: message
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;')
+        .replace(/\$/g, '&#36;')
+        .replace(/\{/g, '&#123;')
+        .replace(/\}/g, '&#125;'),
       type // 'info', 'success', 'warning', 'error'
     };
 
