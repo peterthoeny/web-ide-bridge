@@ -37,7 +37,7 @@ import (
 
 // Version variables that can be set via build flags
 var (
-	Version = "1.1.1" // Default version, can be overridden at build time
+	Version = "1.1.2" // Default version, can be overridden at build time
 )
 
 // getVersion returns the version string

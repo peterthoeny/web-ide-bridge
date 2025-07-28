@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Bridge web applications to desktop IDEs for seamless code editing",
   "private": true,
   "workspaces": [

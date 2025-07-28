@@ -1,4 +1,4 @@
-# Web-IDE-Bridge Technical Implementation Guide v1.1.1
+# Web-IDE-Bridge Technical Implementation Guide v1.1.2
 
 **Advanced technical documentation for contributors and implementers**
 
