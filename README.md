@@ -34,50 +34,49 @@ web-ide-bridge/
 ├── LICENSE                         # GPL v3 license file
 ├── package.json                    # Root package configuration
 ├── package-lock.json               # Locked dependencies
-
 ├── .gitignore                      # Git ignore patterns
 ├── build.sh                        # Cross-platform build script
-├── server/version.js               # Server version configuration
-├── browser/version.js              # Browser version configuration
 ├── bump-version.js                 # Version bump automation script
-├── developer_context.md            # Technical implementation guide (advanced)
+├── developer_context.md            # Technical implementation guide
 ├── browser/                        # Browser component
-│   ├── demo.html                       # Demo page with textarea forms
-│   ├── jquery-demo.html                # jQuery-based custom UI demo
-│   ├── index.html                      # Additional demo page
-│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library (development)
-│   ├── web-ide-bridge.min.js           # Minified production version
-│   ├── web-ide-bridge.js.map           # Source map for development
-│   ├── web-ide-bridge.min.js.map       # Source map for production
+│   ├── README.md                       # Notes
 │   ├── package.json                    # Browser package configuration
+│   ├── index.html                      # Demo homepage
+│   ├── demo.html                       # Demo with simple integration
+│   ├── jquery-demo.html                # Demo with jQuery-based custom UI integration
+│   ├── web-ide-bridge.js               # Web-IDE-Bridge client library
+│   ├── web-ide-bridge.min.js           # Minified production version
+│   ├── web-ide-bridge.min.js.map       # Source map for production
+│   ├── version.js                      # Version configuration
 │   └── assets/                         # Demo assets
 │       ├── web-ide-bridge-24.png       # 24x24 icon for demo pages
 │       └── favicon.ico                 # Favicon for demo pages
-├── bin/                           # Build outputs (cross-platform)
-│   ├── darwin_amd64/                  # macOS Intel builds
-│   ├── darwin_arm64/                  # macOS Apple Silicon builds
-│   ├── linux_amd64/                   # Linux Intel/AMD builds
-│   └── windows_amd64/                 # Windows Intel/AMD builds
+├── server/                         # Server component
+│   ├── README.md                       # Notes
+│   ├── package.json                    # Node.js package configuration
+│   ├── web-ide-bridge-server.conf      # Server configuration file (JSON)
+│   ├── web-ide-bridge-server.js        # Node.js WebSocket server
+│   ├── version.js                      # Version configuration
+│   └── assets/                         # Server assets
+│       ├── web-ide-bridge-24.png           # 24x24 icon for status page
+│       └── favicon.ico                     # Favicon for status page
 ├── desktop/                        # Desktop component
+│   ├── README.md                       # Notes
+│   ├── web-ide-bridge.conf             # Desktop app/org config (JSON)
 │   ├── web-ide-bridge.go               # Main Go application (desktop app)
 │   ├── go.mod                          # Go module definition
 │   ├── go.sum                          # Go module checksums
-│   ├── web-ide-bridge.conf             # Desktop app/org config (JSON)
 │   └── assets/                         # App icons and assets
 │       ├── web-ide-bridge.png              # App icon (PNG format)
 │       ├── web-ide-bridge-24.png           # 24x24 icon for UI
 │       ├── web-ide-bridge.icns             # macOS app icon
 │       ├── web-ide-bridge.ico              # Windows app icon
 │       └── favicon.ico                     # Favicon
-├── server/                         # Server component
-│   ├── README.md                       # Server-specific notes
-│   ├── package.json                    # Node.js package configuration
-│   ├── package-lock.json               # Locked dependencies
-│   ├── web-ide-bridge-server.conf      # Server configuration file (JSON)
-│   ├── web-ide-bridge-server.js        # Node.js WebSocket server
-│   └── assets/                         # Server assets
-│       ├── web-ide-bridge-24.png           # 24x24 icon for status page
-│       └── favicon.ico                     # Favicon for status page
+├── bin/                           # Build outputs for desktop app (cross-platform)
+│   ├── darwin_amd64/                  # macOS Intel builds
+│   ├── darwin_arm64/                  # macOS Apple Silicon builds
+│   ├── linux_amd64/                   # Linux Intel/AMD builds
+│   └── windows_amd64/                 # Windows Intel/AMD builds
 └── tests/                          # Test infrastructure
     ├── run-server-tests.js             # Standalone server test runner
     ├── browser/                        # Browser library tests
