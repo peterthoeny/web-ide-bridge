@@ -168,10 +168,13 @@ class WebIdeBridgeServer {
 
     const finalConfig = fileConfig ? this.mergeConfig(defaultConfig, fileConfig) : defaultConfig;
 
-    console.log(`Configuration loaded from: ${configSource}`);
-    if (finalConfig.debug) {
-      console.log('Final configuration:', JSON.stringify(finalConfig, null, 2));
+    // Environment variable should override config file for debug setting
+    if (process.env.DEBUG !== undefined) {
+      finalConfig.debug = process.env.DEBUG === 'true';
     }
+
+    console.log(`Configuration loaded from: ${configSource}`);
+    console.log('Final configuration:', JSON.stringify(finalConfig, null, 2));
 
     return finalConfig;
   }
@@ -364,9 +367,9 @@ class WebIdeBridgeServer {
             console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
 
             // Add to activity log
-            this.addActivityLogEntry(`Server started on ${this.config.server.host}:${this.config.server.port}`, 'success');
-            this.addActivityLogEntry(`WebSocket endpoint: ${this.wsOptions.path}`, 'info');
-            this.addActivityLogEntry(`Environment: ${this.config.environment}`, 'info');
+                this._log(`Server started on ${this.config.server.host}:${this.config.server.port}`, 'success');
+    this._log(`WebSocket endpoint: ${this.wsOptions.path}`, 'info');
+    this._log(`Environment: ${this.config.environment}`, 'info');
           }
 
           resolve();
@@ -471,9 +474,7 @@ class WebIdeBridgeServer {
     // Set the connectionId provided by the client
     ws.connectionId = connectionId;
 
-    if (this.config.debug) {
-      console.log(`Connection initialized with client connectionId: ${connectionId} from ${ws.clientIP}`);
-    }
+    this._log(`Connection initialized with client connectionId: ${connectionId} from ${ws.clientIP}`);
 
     // Send acknowledgment
     this.sendMessage(ws, {
@@ -492,9 +493,7 @@ class WebIdeBridgeServer {
 
     this.metrics.totalConnections++;
 
-    if (this.config.debug) {
-      console.log(`New WebSocket connection from ${clientIP} (waiting for connectionId)`);
-    }
+    this._log(`New WebSocket connection from ${clientIP} (waiting for connectionId)`);
 
     // Set up connection properties (but no connectionId yet)
     ws.isAlive = true;
@@ -620,12 +619,7 @@ class WebIdeBridgeServer {
     this.sendDesktopStatusToBrowser(userId);
     this.sendBrowserStatusToDesktop(userId);
 
-    // Add to activity log
-    this.addActivityLogEntry(`Browser connected: ${userId} (${ws.connectionId})`, 'success');
-
-    if (this.config.debug) {
-      console.log(`Browser connected: userId=${userId}, connectionId=${ws.connectionId}`);
-    }
+    this._log(`Browser connected, userId: ${userId}, connectionId: ${ws.connectionId}`, 'success');
   }
 
   /**
@@ -666,12 +660,7 @@ class WebIdeBridgeServer {
     this.sendBrowserStatusToDesktop(userId);
     this.sendDesktopStatusToBrowser(userId);
 
-    // Add to activity log
-    this.addActivityLogEntry(`Desktop connected: ${userId} (${ws.connectionId})`, 'success');
-
-    if (this.config.debug) {
-      console.log(`Desktop connected: userId=${userId}, connectionId=${ws.connectionId}`);
-    }
+    this._log(`Desktop connected, userId: ${userId}, connectionId: ${ws.connectionId}`, 'success');
   }
 
   /**
@@ -719,11 +708,15 @@ class WebIdeBridgeServer {
       fileType
     });
 
-    // Add to activity log
-    this.addActivityLogEntry(`Edit request: ${userId} → ${snippetId}`, 'info');
-
     if (this.config.debug) {
-      console.log(`Edit request: userId=${userId}, snippetId=${snippetId}, codeLength=${code.length}`);
+      // Include code snippet in debug mode
+      let processedCode = code.replace(/\n/g, '\\n');
+      if (processedCode.length > 100) {
+        processedCode = `${processedCode.substring(0, 100)}...${processedCode.substring(processedCode.length - 20)}`;
+      }
+      this._log(`Browser edit request for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, codeLength: ${code.length}, code: '${processedCode}'`, 'info');
+    } else {
+      this._log(`Browser edit request for userId: ${userId}, snippetId: ${snippetId}, fileType: ${fileType}, codeLength: ${code.length}`, 'info');
     }
   }
 
@@ -737,6 +730,8 @@ class WebIdeBridgeServer {
       this.sendError(ws, 'code_update requires userId, snippetId, and code');
       return;
     }
+
+    this._log(null, 'info', { userId, snippetId, code, fileType });
 
     const sessionKey = userId + ':' + snippetId;
     if (this.config.debug) {
@@ -847,12 +842,7 @@ class WebIdeBridgeServer {
       }
     }
 
-    // Add to activity log
-    this.addActivityLogEntry(`Code update: ${userId} ← ${session.snippetId}`, 'info');
 
-    if (this.config.debug) {
-      console.log(`Code update: userId=${userId}, snippetId=${session.snippetId}, codeLength=${code.length}`);
-    }
   }
 
   /**
@@ -891,14 +881,12 @@ class WebIdeBridgeServer {
    * Handle WebSocket disconnection
    */
   handleDisconnection(ws, code, reason) {
-    if (this.config.debug) {
-      console.log(`WebSocket disconnected: ${ws.connectionId}, code=${code}, reason=${reason}`);
-    }
-
     // Remove from browser connections
     if (this.browserConnections.has(ws.connectionId)) {
       const browserConn = this.browserConnections.get(ws.connectionId);
       this.browserConnections.delete(ws.connectionId);
+
+      this._log(`Browser disconnected, userId: ${browserConn.userId}, connectionId: ${ws.connectionId}, code: ${code}, reason: ${reason}`, 'warning');
 
       // Update user session
       const userSession = this.userSessions.get(browserConn.userId);
@@ -910,15 +898,14 @@ class WebIdeBridgeServer {
         }
       }
       this.sendBrowserStatusToDesktop(browserConn.userId);
-
-      // Add to activity log
-      this.addActivityLogEntry(`Browser disconnected: ${browserConn.userId} (${ws.connectionId})`, 'warning');
     }
 
     // Remove from desktop connections
     if (this.desktopConnections.has(ws.connectionId)) {
       const desktopConn = this.desktopConnections.get(ws.connectionId);
       this.desktopConnections.delete(ws.connectionId);
+
+      this._log(`Desktop disconnected, userId: ${desktopConn.userId}, connectionId: ${ws.connectionId}, code: ${code}, reason: ${reason}`, 'warning');
 
       // Update user session
       const userSession = this.userSessions.get(desktopConn.userId);
@@ -930,9 +917,6 @@ class WebIdeBridgeServer {
         }
       }
       this.sendDesktopStatusToBrowser(desktopConn.userId);
-
-      // Add to activity log
-      this.addActivityLogEntry(`Desktop disconnected: ${desktopConn.userId} (${ws.connectionId})`, 'warning');
     }
 
     // Clean up active sessions associated with this connection
@@ -969,12 +953,9 @@ class WebIdeBridgeServer {
   sendError(ws, message, code = 'ERROR') {
     this.metrics.errors++;
 
-    if (this.config.debug) {
-      console.error(`Error: ${message} (connection: ${ws.connectionId})`);
-    }
+    this._log(`Error: ${message}, connectionId: ${ws.connectionId}`, 'error');
 
-    // Add to activity log
-    this.addActivityLogEntry(`Error: ${message} (${ws.connectionId})`, 'error');
+
 
     this.sendMessage(ws, {
       type: 'error',
@@ -1585,7 +1566,7 @@ class WebIdeBridgeServer {
 
     if (cleanedCount > 0 && this.config.debug) {
       console.log(`Cleaned up ${cleanedCount} expired sessions`);
-      this.addActivityLogEntry(`Cleaned up ${cleanedCount} expired sessions`, 'info');
+      this._log(`Cleaned up ${cleanedCount} expired sessions`, 'info');
     }
   }
 
@@ -1609,7 +1590,7 @@ class WebIdeBridgeServer {
 
     if (cleanedCount > 0 && this.config.debug) {
       console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
-      this.addActivityLogEntry(`Cleaned up ${cleanedCount} expired rate limit entries`, 'info');
+      this._log(`Cleaned up ${cleanedCount} expired rate limit entries`, 'info');
     }
   }
 
@@ -1679,7 +1660,7 @@ class WebIdeBridgeServer {
     this.isShuttingDown = true;
     try {
       console.log('Starting server shutdown...');
-      this.addActivityLogEntry('Server shutdown initiated', 'warning');
+      this._log('Server shutdown initiated', 'warning');
 
       // Clear all intervals first
       if (this.cleanupInterval) {
@@ -1697,7 +1678,7 @@ class WebIdeBridgeServer {
       // Close all WebSocket connections with proper cleanup
       if (this.wss && this.wss.clients) {
         console.log(`Closing ${this.wss.clients.size} WebSocket connections...`);
-        this.addActivityLogEntry(`Closing ${this.wss.clients.size} WebSocket connections`, 'info');
+        this._log(`Closing ${this.wss.clients.size} WebSocket connections`, 'info');
         const closePromises = [];
 
         this.wss.clients.forEach((ws) => {
@@ -1718,7 +1699,7 @@ class WebIdeBridgeServer {
 
         await Promise.all(closePromises);
         console.log('All WebSocket connections closed');
-        this.addActivityLogEntry('All WebSocket connections closed', 'info');
+        this._log('All WebSocket connections closed', 'info');
       }
 
       // Close WebSocket server
@@ -1782,14 +1763,14 @@ class WebIdeBridgeServer {
       this.removeProcessHandlers();
 
       console.log('Server shutdown complete');
-      this.addActivityLogEntry('Server shutdown complete', 'success');
+      this._log('Server shutdown complete', 'success');
 
       // Give a moment for everything to settle
       await new Promise(resolve => setTimeout(resolve, 100));
 
     } catch (error) {
       console.error('Error during shutdown:', error);
-      this.addActivityLogEntry(`Shutdown error: ${error.message}`, 'error');
+      this._log(`Shutdown error: ${error.message}`, 'error');
       // Don't re-throw the error to prevent uncaught exception
     }
   }
@@ -1828,28 +1809,64 @@ class WebIdeBridgeServer {
   }
 
   /**
-   * Smart logging helper for large objects
+   * Get formatted timestamp for logging (server local time)
    */
-  _smartLog(message, data = null) {
-    if (!this.config.debug) return;
+  _getTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
 
-    if (data && typeof data === 'object' && data.code && data.code.length > 100) {
-      const shortenedData = {
-        ...data,
-        code: `${data.code.substring(0, 100)}...${data.code.substring(data.code.length - 20)} (${data.code.length} chars total)`
-      };
-      console.log(message, shortenedData);
+  /**
+   * Unified logging function with optional activity log entry
+   */
+  _log(message, type = null, data = null) {
+    const timestamp = this._getTimestamp();
+
+    // Handle code update data specially
+    if (data && typeof data === 'object' && data.code) {
+      let processedCode = data.code;
+
+      // Replace newlines with \n for single-line logging
+      processedCode = processedCode.replace(/\n/g, '\\n');
+
+      // Truncate if too long
+      if (processedCode.length > 120 && this.config.debug) {
+        processedCode = `${processedCode.substring(0, 100)}...${processedCode.substring(processedCode.length - 20)}`;
+      }
+
+      // Create detailed log for console and activity log
+      const logMessage = this.config.debug 
+        ? `Desktop code update for userId: ${data.userId || 'unknown'}, snippetId: ${data.snippetId || 'unknown'}, fileType: ${data.fileType || 'txt'}, code: '${processedCode}', codeLength: ${data.code.length}`
+        : `Desktop code update for userId: ${data.userId || 'unknown'}, snippetId: ${data.snippetId || 'unknown'}, fileType: ${data.fileType || 'txt'}, codeLength: ${data.code.length}`;
+      console.log(`${timestamp}: ${logMessage}`);
+
+      // Add to activity log if type is provided
+      if (type) {
+        this.addActivityLogEntry(timestamp, logMessage, type);
+      }
     } else {
-      console.log(message, data);
+      // Regular logging
+      console.log(`${timestamp}: ${message}`);
+
+      // Add to activity log if type is provided
+      if (type) {
+        this.addActivityLogEntry(timestamp, message, type);
+      }
     }
   }
 
   /**
    * Add entry to activity log
    */
-  addActivityLogEntry(message, type = 'info') {
+  addActivityLogEntry(timestamp, message, type = 'info') {
     const entry = {
-      timestamp: new Date().toISOString(),
+      time: timestamp.replace(/^\d+[^ ]*/, ''),
       message,
       type // 'info', 'success', 'warning', 'error'
     };
@@ -1866,11 +1883,7 @@ class WebIdeBridgeServer {
    * Get formatted activity log entries
    */
   getActivityLogEntries(limit = 20) {
-    return this.activityLog.slice(0, limit).map(entry => ({
-      ...entry,
-      time: new Date(entry.timestamp).toLocaleTimeString(),
-      date: new Date(entry.timestamp).toLocaleDateString()
-    }));
+    return this.activityLog.slice(0, limit);
   }
 
   /**
