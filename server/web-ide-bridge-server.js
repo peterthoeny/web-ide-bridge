@@ -85,7 +85,7 @@ class WebIdeBridgeServer {
     for (const configPath of configPaths) {
       try {
         if (fs.existsSync(configPath)) {
-          console.log(`Loading configuration from: ${configPath}`);
+          this._log(`Loading configuration from: ${configPath}`);
           const configData = fs.readFileSync(configPath, 'utf8');
           fileConfig = JSON.parse(configData);
           configSource = configPath;
@@ -174,8 +174,8 @@ class WebIdeBridgeServer {
       finalConfig.debug = process.env.DEBUG === 'true';
     }
 
-    console.log(`Configuration loaded from: ${configSource}`);
-    console.log('Final configuration:', JSON.stringify(finalConfig, null, 2));
+    this._log(`Configuration loaded from: ${configSource}`);
+    this._log(`Final configuration: ${JSON.stringify(finalConfig, null, 2)}`);
 
     return finalConfig;
   }
@@ -381,15 +381,15 @@ class WebIdeBridgeServer {
 
           // Only log if not in test environment
           if (process.env.NODE_ENV !== 'test') {
-            console.log(`Web-IDE-Bridge server v${VERSION} running on ${this.config.server.host}:${this.config.server.port}`);
-            console.log(`WebSocket endpoint: ${this.wsOptions.path}`);
-            console.log(`Environment: ${this.config.environment}`);
-            console.log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
+            this._log(`Web-IDE-Bridge server v${VERSION} running on ${this.config.server.host}:${this.config.server.port}`);
+            this._log(`WebSocket endpoint: ${this.wsOptions.path}`);
+            this._log(`Environment: ${this.config.environment}`);
+            this._log(`Debug mode: ${this.config.debug ? 'enabled' : 'disabled'}`);
 
             // Add to activity log
-                this._log(`Server started on ${this.config.server.host}:${this.config.server.port}`, 'success');
-    this._log(`WebSocket endpoint: ${this.wsOptions.path}`, 'info');
-    this._log(`Environment: ${this.config.environment}`, 'info');
+            this._log(`Server started on ${this.config.server.host}:${this.config.server.port}`, 'success');
+            this._log(`WebSocket endpoint: ${this.wsOptions.path}`, 'info');
+            this._log(`Environment: ${this.config.environment}`, 'info');
           }
 
           resolve();
@@ -756,8 +756,8 @@ class WebIdeBridgeServer {
 
     const sessionKey = userId + ':' + snippetId;
     if (this.config.debug) {
-      console.log(`Looking for session with key: ${sessionKey}`);
-      console.log(`Available sessions:`, Array.from(this.activeSessions.keys()));
+      this._log(`Looking for session with key: ${sessionKey}`);
+      this._log(`Available sessions: ${Array.from(this.activeSessions.keys())}`);
     }
     const session = this.activeSessions.get(sessionKey);
     if (!session) {
@@ -784,13 +784,13 @@ class WebIdeBridgeServer {
     // Get all browser connections for this user
     const userSession = this.userSessions.get(userId);
     if (this.config.debug) {
-      console.log(`User session for ${userId}:`, userSession);
-      console.log(`Browser IDs:`, userSession ? Array.from(userSession.browserIds || []) : 'no session');
+      this._log(`User session for ${userId}: ${JSON.stringify(userSession)}`);
+      this._log(`Browser IDs: ${userSession ? Array.from(userSession.browserIds || []) : 'no session'}`);
     }
 
     if (!userSession || !userSession.browserIds || userSession.browserIds.size === 0) {
       if (this.config.debug) {
-        console.log(`No browser connections found for user ${userId}`);
+        this._log(`No browser connections found for user ${userId}`);
       }
       // Send info message to desktop
       const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
@@ -810,8 +810,8 @@ class WebIdeBridgeServer {
     const targetBrowserId = session.browserConnectionId;
 
     if (this.config.debug) {
-      console.log(`Looking for target browser connection: ${targetBrowserId}`);
-      console.log(`Available browser connections:`, Array.from(userSession.browserIds));
+      this._log(`Looking for target browser connection: ${targetBrowserId}`);
+      this._log(`Available browser connections: ${Array.from(userSession.browserIds)}`);
     }
 
     if (targetBrowserId && userSession.browserIds.has(targetBrowserId)) {
@@ -824,16 +824,16 @@ class WebIdeBridgeServer {
         });
         delivered = true;
         if (this.config.debug) {
-          console.log(`Code update delivered to target browser ${targetBrowserId}`);
+          this._log(`Code update delivered to target browser ${targetBrowserId}`);
         }
       } else {
         if (this.config.debug) {
-          console.log(`Target browser connection ${targetBrowserId} not found`);
+          this._log(`Target browser connection ${targetBrowserId} not found`);
         }
       }
     } else {
       if (this.config.debug) {
-        console.log(`Target browser ${targetBrowserId} not in user's browser connections`);
+        this._log(`Target browser ${targetBrowserId} not in user's browser connections`);
       }
     }
 
@@ -852,7 +852,7 @@ class WebIdeBridgeServer {
         });
 
         if (this.config.debug) {
-          console.log(`Notified desktop: ${message}`);
+          this._log(`Notified desktop: ${message}`);
         }
       }
     }
@@ -1579,7 +1579,6 @@ class WebIdeBridgeServer {
     }
 
     if (cleanedCount > 0 && this.config.debug) {
-      console.log(`Cleaned up ${cleanedCount} expired sessions`);
       this._log(`Cleaned up ${cleanedCount} expired sessions`, 'info');
     }
   }
@@ -1603,7 +1602,6 @@ class WebIdeBridgeServer {
     }
 
     if (cleanedCount > 0 && this.config.debug) {
-      console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
       this._log(`Cleaned up ${cleanedCount} expired rate limit entries`, 'info');
     }
   }
@@ -1621,7 +1619,7 @@ class WebIdeBridgeServer {
     this.removeProcessHandlers();
 
     const shutdown = (signal) => {
-      console.log(`Received ${signal}, shutting down gracefully...`);
+      this._log(`Received ${signal}, shutting down gracefully...`);
       this.shutdown();
     };
 
@@ -1667,31 +1665,31 @@ class WebIdeBridgeServer {
    */
   async shutdown() {
     if (this.isShuttingDown) {
-      console.log('Server is already in the process of shutting down.');
+      this._log('Server is already in the process of shutting down.');
       return;
     }
 
     this.isShuttingDown = true;
     try {
-      console.log('Starting server shutdown...');
+      this._log('Starting server shutdown...');
       this._log('Server shutdown initiated', 'warning');
 
       // Clear all intervals first
       if (this.cleanupInterval) {
         clearInterval(this.cleanupInterval);
         this.cleanupInterval = null;
-        console.log('Cleared cleanup interval');
+        this._log('Cleared cleanup interval');
       }
 
       if (this.heartbeatInterval) {
         clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = null;
-        console.log('Cleared heartbeat interval');
+        this._log('Cleared heartbeat interval');
       }
 
       // Close all WebSocket connections with proper cleanup
       if (this.wss && this.wss.clients) {
-        console.log(`Closing ${this.wss.clients.size} WebSocket connections...`);
+        this._log(`Closing ${this.wss.clients.size} WebSocket connections...`);
         this._log(`Closing ${this.wss.clients.size} WebSocket connections`, 'info');
         const closePromises = [];
 
@@ -1712,7 +1710,7 @@ class WebIdeBridgeServer {
         });
 
         await Promise.all(closePromises);
-        console.log('All WebSocket connections closed');
+        this._log('All WebSocket connections closed');
         this._log('All WebSocket connections closed', 'info');
       }
 
@@ -1725,13 +1723,13 @@ class WebIdeBridgeServer {
                 console.error('Error closing WebSocket server:', error);
                 reject(error);
               } else {
-                console.log('WebSocket server closed');
+                this._log('WebSocket server closed');
                 resolve();
               }
             });
           });
         } catch (error) {
-          console.log('WebSocket server already closed or error during close:', error.message);
+          this._log(`WebSocket server already closed or error during close: ${error.message}`);
         }
         this.wss = null;
       }
@@ -1745,13 +1743,13 @@ class WebIdeBridgeServer {
                 console.error('Error closing HTTP server:', error);
                 reject(error);
               } else {
-                console.log('HTTP server closed');
+                this._log('HTTP server closed');
                 resolve();
               }
             });
           });
         } catch (error) {
-          console.log('HTTP server already closed or error during close:', error.message);
+          this._log(`HTTP server already closed or error during close: ${error.message}`);
         }
         this.server = null;
       }
@@ -1776,7 +1774,7 @@ class WebIdeBridgeServer {
       // Remove process handlers
       this.removeProcessHandlers();
 
-      console.log('Server shutdown complete');
+      this._log('Server shutdown complete');
       this._log('Server shutdown complete', 'success');
 
       // Give a moment for everything to settle
@@ -1853,6 +1851,9 @@ class WebIdeBridgeServer {
       }
       message = message.replace(/%CODE%/, code);
     }
+
+    // Clean up whitespace - remove newlines and extra whitespace
+    message = message.replace(/\s+/g, ' ');
     console.log(`${timestamp}: ${message}`);
 
     // Add to activity log if type is provided
