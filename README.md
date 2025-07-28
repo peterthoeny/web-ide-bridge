@@ -465,6 +465,9 @@ webIdeBridge.onCodeUpdate((snippetId, updatedCode) => {
 
 ### 🎯 Core Functionality
 
+- **Cross-Platform Line Ending Support**: Automatically normalizes line endings to Unix-style LF for consistent behavior across Windows, macOS, and Linux
+- **Configurable Line Ending Handling**: Server can be configured to preserve or normalize line endings via `normalizeLineEndings` setting
+
 - **Seamless Integration**: One-line integration into existing web applications
 - **Real-time Synchronization**: Instant sync between IDE and browser
 - **Multi-file Support**: Handle multiple code snippets simultaneously

@@ -115,6 +115,7 @@ class WebIdeBridgeServer {
         maxConnections: 1000,
         connectionTimeout: 300000
       },
+      normalizeLineEndings: true, // Normalize line endings to LF
       endpoints: {
         health: '/web-ide-bridge/health',
         status: '/web-ide-bridge/status',
@@ -345,6 +346,19 @@ class WebIdeBridgeServer {
     record.resetTime = now + windowMs;
 
     return record.requests.length <= maxRequests;
+  }
+
+  /**
+   * Normalize line endings to Unix-style LF
+   * @param {string} content - The content to normalize
+   * @returns {string} - Content with normalized line endings
+   */
+  normalizeLineEndings(content) {
+    if (!this.config.normalizeLineEndings) {
+      return content;
+    }
+    // First remove all \r, then ensure \n for line breaks
+    return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   }
 
   /**
@@ -673,7 +687,8 @@ class WebIdeBridgeServer {
    * Handle edit request from browser
    */
   handleEditRequest(ws, message) {
-    const { userId, snippetId, code, fileType } = message;
+    const { userId, snippetId, code: rawCode, fileType } = message;
+    const code = this.normalizeLineEndings(rawCode);
 
     if (!userId || !snippetId || !code) {
       this.sendError(ws, 'Error: Edit request is missing required information. Please try again.');
@@ -730,7 +745,8 @@ class WebIdeBridgeServer {
    * Handle code update from desktop
    */
   handleCodeUpdate(ws, message) {
-    const { userId, snippetId, code, fileType } = message;
+    const { userId, snippetId, code: rawCode, fileType } = message;
+    const code = this.normalizeLineEndings(rawCode);
 
     if (!userId || !snippetId || !code) {
       this.sendError(ws, 'Error: Code update is missing required information. Please try again.');
