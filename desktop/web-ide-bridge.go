@@ -297,6 +297,45 @@ func (c *WebSocketClient) Start() {
 	go c.connectLoop()
 }
 
+// Restart safely closes the current connection and starts a new one
+func (c *WebSocketClient) Restart() {
+	c.log("Restarting WebSocket connection...")
+
+	// Get list of active watchers before closing
+	activeWatchers := c.getActiveWatchers()
+
+	c.Close() // Close the current connection and stop all watchers
+	c.Start() // Start a new connection
+
+	// Restore watchers after connection is established
+	if len(activeWatchers) > 0 {
+		c.log(fmt.Sprintf("Restoring %d active file watchers after reconnect", len(activeWatchers)))
+		// Give the connection a moment to establish before restoring watchers
+		time.Sleep(500 * time.Millisecond)
+		c.restoreWatchers(activeWatchers)
+	}
+}
+
+// RestartWithConfig safely closes the current connection, updates config, and starts a new one
+func (c *WebSocketClient) RestartWithConfig(newConfig Config) {
+	c.log("Restarting WebSocket connection with new configuration...")
+
+	// Get list of active watchers before closing
+	activeWatchers := c.getActiveWatchers()
+
+	c.Close() // Close the current connection and stop all watchers
+	c.cfg = newConfig
+	c.Start() // Start a new connection
+
+	// Restore watchers after connection is established
+	if len(activeWatchers) > 0 {
+		c.log(fmt.Sprintf("Restoring %d active file watchers after reconnect", len(activeWatchers)))
+		// Give the connection a moment to establish before restoring watchers
+		time.Sleep(500 * time.Millisecond)
+		c.restoreWatchers(activeWatchers)
+	}
+}
+
 // Main connection loop: handles connect, reconnect, and cleanup
 func (c *WebSocketClient) connectLoop() {
 	for {
@@ -480,7 +519,15 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 		return
 	}
 	c.log(fmt.Sprintf("Now watching for %s file changes in IDE...", snippetId))
-	lastContent := ""
+
+	// Initialize lastContent with current file content to avoid detecting initial file creation
+	initialContent, err := os.ReadFile(tmpFile)
+	if err != nil {
+		c.log("Failed to read initial file content: " + err.Error())
+		return
+	}
+	lastContent := string(initialContent)
+
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -515,6 +562,47 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 	}
 }
 
+// Get list of active watchers (for restoration after reconnect)
+func (c *WebSocketClient) getActiveWatchers() map[string]string {
+	c.watchersMu.Lock()
+	defer c.watchersMu.Unlock()
+
+	activeWatchers := make(map[string]string)
+	for snippetId := range c.watchers {
+		// Reconstruct the temp file path
+		sanitizeSnippetId := func(snippetId string) string {
+			var b strings.Builder
+			for _, r := range snippetId {
+				if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+					b.WriteRune(r)
+				} else {
+					b.WriteRune('_')
+				}
+			}
+			return b.String()
+		}
+		sanitizedId := sanitizeSnippetId(snippetId)
+		tmpFile := filepath.Join(os.TempDir(), "web-"+sanitizedId+".js") // Default to .js, will be corrected below
+
+		// Try to determine the actual file type by checking what files exist
+		for _, ext := range []string{"js", "py", "java", "cpp", "c", "go", "rs", "php", "rb", "ts", "html", "css", "json", "xml", "md", "txt"} {
+			testFile := filepath.Join(os.TempDir(), "web-"+sanitizedId+"."+ext)
+			if _, err := os.Stat(testFile); err == nil {
+				tmpFile = testFile
+				break
+			}
+		}
+
+		// Extract file type from the found file
+		ext := filepath.Ext(tmpFile)
+		if ext != "" {
+			fileType := strings.TrimPrefix(ext, ".")
+			activeWatchers[snippetId] = fileType
+		}
+	}
+	return activeWatchers
+}
+
 // Stop all file watchers (on disconnect/shutdown)
 func (c *WebSocketClient) stopAllWatchers() {
 	c.watchersMu.Lock()
@@ -524,6 +612,34 @@ func (c *WebSocketClient) stopAllWatchers() {
 	}
 	c.watchers = make(map[string]chan struct{})
 	c.watchersMu.Unlock()
+}
+
+// Restore watchers from a saved list
+func (c *WebSocketClient) restoreWatchers(watchers map[string]string) {
+	for snippetId, fileType := range watchers {
+		// Reconstruct the temp file path
+		sanitizeSnippetId := func(snippetId string) string {
+			var b strings.Builder
+			for _, r := range snippetId {
+				if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+					b.WriteRune(r)
+				} else {
+					b.WriteRune('_')
+				}
+			}
+			return b.String()
+		}
+		sanitizedId := sanitizeSnippetId(snippetId)
+		tmpFile := filepath.Join(os.TempDir(), "web-"+sanitizedId+"."+fileType)
+
+		// Check if the file still exists before restoring the watcher
+		if _, err := os.Stat(tmpFile); err == nil {
+			c.log(fmt.Sprintf("Restoring watcher for existing file: %s (%s)", snippetId, fileType))
+			c.startFileWatcher(snippetId, tmpFile, fileType)
+		} else {
+			c.log(fmt.Sprintf("Skipping watcher restoration for %s - file no longer exists", snippetId))
+		}
+	}
 }
 
 // Send code update to server
@@ -589,8 +705,30 @@ func (c *WebSocketClient) log(msg string) {
 
 // Graceful shutdown
 func (c *WebSocketClient) Close() {
+	// Check if client is properly initialized
+	if c.stopCh == nil {
+		return // Not initialized
+	}
+
+	// Check current status
+	currentStatus := c.getStatus()
+	if currentStatus == "shutdown" {
+		return // Already shutting down
+	}
+
 	c.log("Shutting down Web-IDE-Bridge client...")
-	close(c.stopCh)
+
+	// Set status to shutdown to prevent multiple close attempts
+	c.setStatus("shutdown")
+
+	// Safely close stopCh only if it hasn't been closed yet
+	select {
+	case <-c.stopCh:
+		// Channel already closed
+	default:
+		close(c.stopCh)
+	}
+
 	c.stopAllWatchers()
 	if c.conn != nil {
 		c.conn.Close()
@@ -778,10 +916,7 @@ func main() {
 			go func() {
 				appendLog(time.Now().Format("15:04:05 ") + "Manual reconnect initiated...")
 				log.Println("Manual reconnect initiated...")
-				wsClient.stopCh <- struct{}{}
-				newClient := NewWebSocketClient(cfg, appendLog)
-				wsClient = newClient
-				wsClient.Start()
+				wsClient.Restart()
 			}()
 		})
 	reconnectBtn.Importance = widget.HighImportance
@@ -891,10 +1026,7 @@ func main() {
 						ideVal.SetText(cfg.IDECommand)
 						go func() {
 							appendLog("Restarting connection with new configuration...")
-							wsClient.stopCh <- struct{}{}
-							newClient := NewWebSocketClient(cfg, appendLog)
-							wsClient = newClient
-							wsClient.Start()
+							wsClient.RestartWithConfig(cfg)
 						}()
 					}
 				}
