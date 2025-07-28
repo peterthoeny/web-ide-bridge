@@ -324,7 +324,7 @@
 
       button.addEventListener('click', async () => {
         if (!this.webIdeBridge.isConnected()) {
-          alert('Please connect to Web-IDE-Bridge server first');
+          alert('Please connect to Web-IDE-Bridge server first to edit code in your IDE');
           return;
         }
         try {
@@ -333,7 +333,7 @@
           await this.webIdeBridge.editCodeSnippet(textarea.id, code, fileType);
         } catch (error) {
           console.error('Failed to send code to IDE:', error);
-          alert('Failed to send code to IDE: ' + error.message);
+          alert(`Failed to send code to IDE: ${error.message}. Please check your connection and try again.`);
         }
       });
 
@@ -444,12 +444,12 @@
       }
       this.debouncedReconnect = debounce(this._attemptReconnect.bind(this), 1000);
 
-      this._log('WebIdeBridge initialized', { userId, connectionId: this.connectionId });
+      this._log('Web-IDE-Bridge initialized for user', { userId, connectionId: this.connectionId });
     }
 
     async connect() {
       if (this.connected || this.connecting) {
-        this._log('Already connected or connecting');
+        this._log('Already connected to server or connection in progress');
         return;
       }
 
@@ -459,7 +459,7 @@
       try {
         await this._establishConnection();
         this.reconnectAttempts = 0;
-        this._log('Successfully connected to server');
+        this._log('Successfully connected to Web-IDE-Bridge server');
       } catch (error) {
         this.connecting = false;
         this._handleConnectionError(error);
@@ -468,7 +468,7 @@
     }
 
     disconnect() {
-      this._log('Disconnecting from server');
+      this._log('Disconnecting from Web-IDE-Bridge server');
 
       this._clearTimeouts();
       this.options.autoReconnect = false;
@@ -516,21 +516,8 @@
         timestamp: Date.now()
       };
 
-      this._log('Sending edit request', { snippetId, fileType });
+      this._log('Sending code snippet to IDE for editing', { snippetId, fileType });
       this._sendMessage(message);
-
-      // If addButtons is false, send info message to server
-      if (this.options.addButtons === false) {
-        this._sendMessage({
-          type: 'info',
-          connectionId: this.connectionId,
-          userId: this.userId,
-          payload: {
-            snippetId,
-            message: 'code has been updated in the web application'
-          }
-        });
-      }
 
       return snippetId;
     }
@@ -580,7 +567,7 @@
     async _establishConnection() {
       return new Promise((resolve, reject) => {
         try {
-          this._log('Establishing WebSocket connection', { url: this.options.serverUrl });
+          this._log('Establishing connection to Web-IDE-Bridge server', { url: this.options.serverUrl });
 
           this.ws = new WebSocket(this.options.serverUrl);
 
@@ -593,7 +580,7 @@
 
           this.ws.onopen = () => {
             clearTimeout(this.connectionTimeout);
-            this._log('WebSocket connection opened');
+            this._log('Connection to Web-IDE-Bridge server opened');
             this._handleConnectionOpen();
             resolve();
           };
@@ -608,8 +595,8 @@
 
           this.ws.onerror = (error) => {
             clearTimeout(this.connectionTimeout);
-            this._log('WebSocket error', error);
-            reject(new Error('WebSocket connection failed'));
+                      this._log('Connection to Web-IDE-Bridge server failed', error);
+          reject(new Error('Connection to Web-IDE-Bridge server failed'));
           };
 
         } catch (error) {
@@ -635,7 +622,7 @@
     }
 
     _handleConnectionClose(event) {
-      this._log('WebSocket connection closed', { code: event.code, reason: event.reason });
+      this._log('Connection to Web-IDE-Bridge server closed', { code: event.code, reason: event.reason });
 
       this.connected = false;
       this.connecting = false;
@@ -648,8 +635,8 @@
     }
 
     _handleConnectionError(error) {
-      this._log('Connection error', error);
-      this._triggerErrorCallbacks(error.message || 'Connection failed');
+      this._log('Connection to Web-IDE-Bridge server error', error);
+      this._triggerErrorCallbacks(error.message || 'Connection to Web-IDE-Bridge server failed');
 
       if (this.options.autoReconnect) {
         this._scheduleReconnect();
@@ -675,7 +662,7 @@
             break;
 
           case 'connection_ack':
-            this._log('Connection acknowledged by server');
+            this._log('Connection acknowledged by Web-IDE-Bridge server');
             break;
 
           case 'code_update':
@@ -683,7 +670,7 @@
             break;
 
           case 'pong':
-            this._log('Received pong from server');
+            this._log('Received heartbeat response from Web-IDE-Bridge server');
             break;
 
           case 'error':
@@ -708,7 +695,7 @@
     _handleConnectionInit(message) {
       if (message.connectionId) {
         this.connectionId = message.connectionId;
-        this._log('Connection ID updated from server', this.connectionId);
+        this._log('Connection ID updated from Web-IDE-Bridge server', this.connectionId);
         // No need to send browser_connect here anymore
         this._startHeartbeat();
       }
@@ -722,7 +709,7 @@
       }
 
       const { snippetId, code } = message;
-      this._log('Received code update', { snippetId, codeLength: code.length });
+      this._log('Received code update from IDE', { snippetId, codeLength: code.length });
       this._log('Number of code update callbacks:', this.codeUpdateCallbacks.length);
 
       let callbackExecuted = false;
@@ -747,7 +734,7 @@
       });
 
       if (!callbackExecuted) {
-        this._log('No callbacks executed for snippet:', snippetId);
+        this._log('No code update callbacks executed for snippet:', snippetId);
       }
 
       // If addButtons is true, send info message to server
@@ -759,7 +746,7 @@
           userId: this.userId,
           payload: {
             snippetId,
-            message: 'code has been updated in the web application'
+            message: `Code snippet ${snippetId} has been updated in the web application`
           }
         });
       }
@@ -767,7 +754,7 @@
 
     _handleServerError(message) {
       const errorMsg = message.payload?.message || 'Unknown server error';
-      this._log('Server error', errorMsg);
+      this._log('Web-IDE-Bridge server error', errorMsg);
       this._triggerErrorCallbacks(errorMsg);
     }
 
@@ -785,10 +772,10 @@
 
       try {
         this.ws.send(JSON.stringify(message));
-        this._log('Sent message', message);
+        this._log('Sent message to Web-IDE-Bridge server', message);
       } catch (error) {
-        this._log('Error sending message', error);
-        throw new Error('Failed to send message to server');
+        this._log('Error sending message to Web-IDE-Bridge server', error);
+        throw new Error('Failed to send message to Web-IDE-Bridge server');
       }
     }
 
@@ -806,7 +793,7 @@
               });
               this._startHeartbeat();
             } catch (error) {
-              this._log('Heartbeat failed', error);
+              this._log('Heartbeat to Web-IDE-Bridge server failed', error);
             }
           }
         }, this.options.heartbeatInterval);
@@ -822,8 +809,8 @@
 
     _scheduleReconnect() {
       if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
-        this._log('Max reconnect attempts reached');
-        this._triggerErrorCallbacks('Max reconnection attempts exceeded');
+              this._log('Maximum reconnection attempts to Web-IDE-Bridge server reached');
+      this._triggerErrorCallbacks('Maximum reconnection attempts to Web-IDE-Bridge server exceeded');
         return;
       }
 
@@ -832,7 +819,7 @@
         30000
       );
 
-      this._log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+      this._log(`Scheduling reconnection attempt ${this.reconnectAttempts + 1} to Web-IDE-Bridge server in ${delay}ms`);
 
       this.reconnectTimeout = setTimeout(() => {
         this.debouncedReconnect();
@@ -845,12 +832,12 @@
       }
 
       this.reconnectAttempts++;
-      this._log(`Reconnect attempt ${this.reconnectAttempts}`);
+      this._log(`Reconnection attempt ${this.reconnectAttempts} to Web-IDE-Bridge server`);
 
       try {
         await this.connect();
       } catch (error) {
-        this._log('Reconnect failed', error);
+        this._log('Reconnection to Web-IDE-Bridge server failed', error);
         if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
           this._scheduleReconnect();
         }

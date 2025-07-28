@@ -702,6 +702,20 @@ we need to rethink this scenario.
 
 ------------------------------
 
-------------------------------
+make the activity log messages (and with thus debug log messages) more user focused, less implementer focused.
 
+example in desktop:
+- "Received edit_request"
+   ==> "Received edit request for code snippet ${snippetId}, type ${fileType}, ${codeLength} chars"
+- "[handleEditRequest] userId=peter, snippetId=javascript-123, fileType=txt, codeLength=401"
+   ==> don't show to user, but keep in log
+- "Saving code to temp file: /var/folders/mx/7m7y8_155nxfqz2w4hg3kqlm0000gn/T/web-javascript-123.txt" and "Launching IDE: Cursor"
+   ==> combine into a single "Saving code snippet ${snippetId} to temp file, and launching IDE ${ide}"
+- "File changed, sending update to server", "[sendCodeUpdate] userId=peter, snippetId=javascript-123, fileType=txt, codeLength=401"
+  ==> combine into a single "Detected temp file save, sending code ${snippetId}, type ${fileType}, ${codeLength} chars to server"
+- "Sent code_update to server"
+  ==> Sent code ${snippetId} to server"
+- fix error cases and other messages in a similar way
+
+------------------------------
 

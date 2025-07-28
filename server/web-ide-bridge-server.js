@@ -467,7 +467,7 @@ class WebIdeBridgeServer {
     const { connectionId } = message;
 
     if (!connectionId || typeof connectionId !== 'string') {
-      this.sendError(ws, 'Connection init requires connectionId');
+      this.sendError(ws, 'Error: Connection initialization failed. Please try reconnecting.');
       return;
     }
 
@@ -588,7 +588,7 @@ class WebIdeBridgeServer {
     ws.connectionId = connectionId;
 
     if (!userId) {
-      this.sendError(ws, 'Browser connection requires userId');
+      this.sendError(ws, 'Error: Web page connection requires user identification. Please refresh the page and try again.');
       return;
     }
 
@@ -630,7 +630,7 @@ class WebIdeBridgeServer {
     ws.connectionId = connectionId;
 
     if (!userId) {
-      this.sendError(ws, 'Desktop connection requires userId');
+      this.sendError(ws, 'Error: Desktop application connection requires user identification. Please restart the desktop app and try again.');
       return;
     }
 
@@ -670,20 +670,20 @@ class WebIdeBridgeServer {
     const { userId, snippetId, code, fileType } = message;
 
     if (!userId || !snippetId || !code) {
-      this.sendError(ws, 'Edit request requires userId, snippetId, and code');
+      this.sendError(ws, 'Error: Edit request is missing required information. Please try again.');
       return;
     }
 
     // Find user's desktop connection
     const userSession = this.userSessions.get(userId);
     if (!userSession || !userSession.desktopId) {
-      this.sendError(ws, 'No desktop connection found for user');
+      this.sendError(ws, 'Error: No desktop application connected. Please start the Web-IDE-Bridge desktop app and try again.');
       return;
     }
 
     const desktopConn = this.desktopConnections.get(userSession.desktopId);
     if (!desktopConn) {
-      this.sendError(ws, 'Desktop connection no longer active');
+      this.sendError(ws, 'Error: Desktop application connection lost. Please restart the Web-IDE-Bridge desktop app and try again.');
       return;
     }
 
@@ -727,7 +727,7 @@ class WebIdeBridgeServer {
     const { userId, snippetId, code, fileType } = message;
 
     if (!userId || !snippetId || !code) {
-      this.sendError(ws, 'code_update requires userId, snippetId, and code');
+      this.sendError(ws, 'Error: Code update is missing required information. Please try again.');
       return;
     }
 
@@ -750,12 +750,12 @@ class WebIdeBridgeServer {
             type: 'info',
             payload: {
               snippetId: snippetId,
-              message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+              message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
             }
           });
         }
       }
-      this.sendError(ws, 'Session not found or expired');
+      this.sendError(ws, 'Error: Edit session expired. Please try editing the code snippet again.');
       return;
     }
 
@@ -780,7 +780,7 @@ class WebIdeBridgeServer {
           type: 'info',
           payload: {
             snippetId: session.snippetId,
-            message: 'Error: Code update could not be delivered. Make sure the web application is ready and in edit mode.'
+            message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
           }
         });
       }
@@ -825,8 +825,8 @@ class WebIdeBridgeServer {
       const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
       if (desktopConn) {
         const message = targetBrowserId 
-          ? 'Error: The browser that initiated this edit session is no longer connected. Please refresh the web application.'
-          : 'Error: No active browser connections. Make sure the web application is open and connected.';
+          ? 'Error: The web page that initiated this edit session is no longer connected. Please refresh the web page and try saving again.'
+          : 'Error: No web page connections found. Please make sure the web page is open and connected, then try saving again.';
 
         this.sendMessage(desktopConn.ws, {
           type: 'info',

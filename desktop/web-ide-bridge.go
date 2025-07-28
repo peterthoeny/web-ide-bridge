@@ -328,7 +328,7 @@ func (c *WebSocketClient) connectLoop() {
 		conn, _, err := websocket.DefaultDialer.Dial(c.cfg.WebSocket, nil)
 		if err != nil {
 			c.setStatus("disconnected")
-			c.log("Connection failed: " + err.Error())
+			c.log("Failed to connect to server: " + err.Error())
 			time.Sleep(10 * time.Second)
 			continue
 		}
@@ -343,18 +343,18 @@ func (c *WebSocketClient) connectLoop() {
 		}
 		if data, err := json.Marshal(desktopConnectMsg); err == nil {
 			c.conn.WriteMessage(websocket.TextMessage, data)
-			c.log("Sent desktop_connect to server")
+			c.log("Registered with server as user: " + c.cfg.UserID)
 		} else {
-			c.log("Failed to marshal desktop_connect message: " + err.Error())
+			c.log("Failed to register with server: " + err.Error())
 		}
 
 		c.setStatus("connected")
-		c.log("Connected to server")
+		c.log("Connected to Web-IDE-Bridge server")
 		pongCh := make(chan struct{})
 		go c.pingPongLoop(pongCh)
 		c.readLoop(pongCh)
 		c.setStatus("disconnected")
-		c.log("Disconnected from server")
+		c.log("Disconnected from Web-IDE-Bridge server")
 		conn.Close()
 		c.stopAllWatchers()
 		// Wait before reconnecting
@@ -389,24 +389,25 @@ func (c *WebSocketClient) readLoop(pongCh chan struct{}) {
 			return
 		}
 		if string(msg) == "pong" {
-			c.log("Received pong from server")
+			// Debug log (not shown in activity log)
+			log.Printf("Received pong from server")
 			continue
 		}
 		// Handle JSON messages
 		var m map[string]interface{}
 		if err := json.Unmarshal(msg, &m); err != nil {
-			c.log("Invalid message: " + err.Error())
+			c.log("Received invalid message from server: " + err.Error())
 			continue
 		}
 		typeVal, _ := m["type"].(string)
 		if typeVal == "edit_request" {
-			c.log("Received edit_request")
 			snippetId, _ := m["snippetId"].(string)
 			code, _ := m["code"].(string)
 			fileType, _ := m["fileType"].(string)
 			if snippetId != "" {
 				c.sessionMap[snippetId] = snippetId
 			}
+			c.log(fmt.Sprintf("Received edit request for code snippet: %s, fileType: %s, codeLength: %d", snippetId, fileType, len(code)))
 			go c.handleEditRequest(snippetId, code, fileType)
 		} else if typeVal == "status_update" {
 			if val, ok := m["browserConnected"].(bool); ok {
@@ -415,10 +416,9 @@ func (c *WebSocketClient) readLoop(pongCh chan struct{}) {
 			}
 		} else if typeVal == "info" {
 			payload, _ := m["payload"].(map[string]interface{})
-			snippetId, _ := payload["snippetId"].(string)
 			message, _ := payload["message"].(string)
 			if message != "" {
-				c.log("[info] snippetId=" + snippetId + ": " + message)
+				c.log(message)
 			}
 		}
 	}
@@ -441,13 +441,15 @@ func (c *WebSocketClient) handleEditRequest(snippetId, code, fileType string) {
 	}
 	sanitizedId := sanitizeSnippetId(snippetId)
 	tmpFile := filepath.Join(tmpDir, "web-"+sanitizedId+"."+fileType)
-	c.log(fmt.Sprintf("[handleEditRequest] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code)))
-	c.log("Saving code to temp file: " + tmpFile)
+
+	// Debug log (not shown in activity log)
+	log.Printf("[handleEditRequest] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code))
+
+	c.log(fmt.Sprintf("Saving code snippet %s to temp file, and launching IDE %s", snippetId, c.cfg.IDECommand))
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
-		c.log("Failed to write temp file: " + err.Error())
+		c.log("Failed to save code snippet to temp file: " + err.Error())
 		return
 	}
-	c.log("Launching IDE: " + c.cfg.IDECommand)
 
 	var cmd *exec.Cmd
 	ideCmd := c.cfg.IDECommand
@@ -480,7 +482,7 @@ func (c *WebSocketClient) handleEditRequest(snippetId, code, fileType string) {
 func (c *WebSocketClient) startFileWatcher(snippetId, tmpFile, fileType string) {
 	c.watchersMu.Lock()
 	if stopCh, ok := c.watchers[snippetId]; ok {
-		c.log("Stopping previous watcher for " + snippetId)
+		c.log("Stopping previous file watcher for snippet: " + snippetId)
 		close(stopCh)
 		delete(c.watchers, snippetId)
 	}
@@ -499,10 +501,10 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 	}
 	defer watcher.Close()
 	if err := watcher.Add(tmpFile); err != nil {
-		c.log("Failed to watch file: " + err.Error())
+		c.log("Failed to watch temp file for changes: " + err.Error())
 		return
 	}
-	c.log("Watching for changes: " + tmpFile)
+	c.log(fmt.Sprintf("Now watching for %s file changes in IDE...", snippetId))
 	lastContent := ""
 	for {
 		select {
@@ -519,7 +521,7 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 				if string(content) != lastContent {
 					lastContent = string(content)
 					if c.getStatus() == "connected" {
-						c.log("File changed, sending update to server")
+						c.log(fmt.Sprintf("Detected temp file change, sending code to server, snippet: %s, fileType: %s, codeLength: %d", snippetId, fileType, len(content)))
 						c.sendCodeUpdate(snippetId, string(content), fileType)
 					} else {
 						c.log("File changed, but not connected. Please save again after reconnect.")
@@ -530,9 +532,9 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 			if !ok {
 				return
 			}
-			c.log("Watcher error: " + err.Error())
+			c.log("File watcher error: " + err.Error())
 		case <-stopCh:
-			c.log("File watcher stopped for " + snippetId)
+			c.log("Stopped watching for file changes in IDE")
 			return
 		}
 	}
@@ -542,7 +544,7 @@ func (c *WebSocketClient) watchFileAndSendUpdates(tmpFile, snippetId, fileType s
 func (c *WebSocketClient) stopAllWatchers() {
 	c.watchersMu.Lock()
 	for id, stopCh := range c.watchers {
-		c.log("Stopping watcher for " + id)
+		c.log("Stopping file watcher for snippet: " + id)
 		close(stopCh)
 	}
 	c.watchers = make(map[string]chan struct{})
@@ -551,7 +553,8 @@ func (c *WebSocketClient) stopAllWatchers() {
 
 // Send code update to server
 func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
-	c.log(fmt.Sprintf("[sendCodeUpdate] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code)))
+	// Debug log (not shown in activity log)
+	log.Printf("[sendCodeUpdate] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code))
 	msg := map[string]interface{}{
 		"type":         "code_update",
 		"connectionId": c.cfg.ConnectionID,
@@ -564,7 +567,7 @@ func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
 	data, _ := json.Marshal(msg)
 	if c.conn != nil {
 		c.conn.WriteMessage(websocket.TextMessage, data)
-		c.log("Sent code_update to server")
+		c.log(fmt.Sprintf("Sent code snippet %s to server", snippetId))
 	}
 }
 
@@ -611,7 +614,7 @@ func (c *WebSocketClient) log(msg string) {
 
 // Graceful shutdown
 func (c *WebSocketClient) Close() {
-	c.log("Shutting down WebSocket client and all watchers.")
+	c.log("Shutting down Web-IDE-Bridge client...")
 	close(c.stopCh)
 	c.stopAllWatchers()
 	if c.conn != nil {
@@ -796,15 +799,16 @@ func main() {
 	)
 
 	// Remove the old connStatusCard and reconnectBtn definitions, and replace with:
-	reconnectBtn := widget.NewButton("Reconnect", func() {
-		go func() {
-			appendLog("Manual reconnect triggered.")
-			wsClient.stopCh <- struct{}{}
-			newClient := NewWebSocketClient(cfg, appendLog)
-			wsClient = newClient
-			wsClient.Start()
-		}()
-	})
+			reconnectBtn := widget.NewButton("Reconnect", func() {
+			go func() {
+				appendLog(time.Now().Format("15:04:05 ") + "Manual reconnect initiated...")
+				log.Println("Manual reconnect initiated...")
+				wsClient.stopCh <- struct{}{}
+				newClient := NewWebSocketClient(cfg, appendLog)
+				wsClient = newClient
+				wsClient.Start()
+			}()
+		})
 	reconnectBtn.Importance = widget.HighImportance
 
 	// Main connection status section
@@ -834,7 +838,7 @@ func main() {
 			}
 			fileDialog := dialog.NewFileOpen(func(uc fyne.URIReadCloser, err error) {
 				if err != nil {
-					appendLog("File dialog error: " + err.Error())
+					appendLog("File browser error: " + err.Error())
 					return
 				}
 				if uc != nil {
@@ -904,14 +908,14 @@ func main() {
 					cfg.IDECommand = ideEntry.Text
 					err := saveConfig(cfg)
 					if err != nil {
-						appendLog("Failed to save config: " + err.Error())
+						appendLog("Failed to save configuration: " + err.Error())
 					} else {
-						appendLog("Configuration updated and saved.")
+						appendLog("Configuration updated and saved successfully.")
 						userVal.SetText(cfg.UserID)
 						wsVal.SetText(cfg.WebSocket)
 						ideVal.SetText(cfg.IDECommand)
 						go func() {
-							appendLog("Restarting WebSocket client with new config...")
+							appendLog("Restarting connection with new configuration...")
 							wsClient.stopCh <- struct{}{}
 							newClient := NewWebSocketClient(cfg, appendLog)
 							wsClient = newClient
@@ -982,11 +986,11 @@ func main() {
 
 	w.SetContent(pad)
 
-	w.SetCloseIntercept(func() {
-		appendLog("Application shutting down...")
-		wsClient.Close()
-		w.Close()
-	})
+			w.SetCloseIntercept(func() {
+			appendLog("Web-IDE-Bridge application shutting down...")
+			wsClient.Close()
+			w.Close()
+		})
 
 	// Goroutine to update status indicator in real time
 	go func() {
