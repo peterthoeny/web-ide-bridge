@@ -262,20 +262,44 @@ cd ..
 
 **💡 Recommendation:** Use the standalone server tests for development and CI/CD. They provide excellent reliability and comprehensive coverage.
 
-### 4. Install Desktop Application
+### 4. Build Components
+
+#### Browser Library
+
+```bash
+# From root directory
+npm run build:browser
+
+# Or from browser directory
+cd browser
+npm run build
+```
+
+The browser build uses **terser** to minify `web-ide-bridge.js` into `web-ide-bridge.min.js` with compression, mangling, and source map generation.
+
+#### Server
+
+```bash
+# From root directory
+npm run build:server
+
+# Or from server directory
+cd server
+npm run build
+```
+
+#### Desktop Application
 
 The desktop app is implemented in Go using the Fyne UI toolkit for native performance and minimal resource usage.
 
-#### Development Mode
-
+**Development Mode:**
 ```bash
 cd desktop
 # Run the desktop app in development mode
 go run web-ide-bridge.go
 ```
 
-#### Production Build
-
+**Production Build:**
 ```bash
 # Build for all platforms (recommended)
 ./build.sh
@@ -298,6 +322,13 @@ GOOS=darwin GOARCH=amd64 go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-
 GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
 
 # The app will automatically use platform-specific icons from the assets/ directory
+```
+
+#### All Components
+
+```bash
+# Build all components at once
+npm run build
 ```
 
 **Build Outputs:**
