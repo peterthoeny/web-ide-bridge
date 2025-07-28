@@ -510,7 +510,7 @@
             <div class="edit-demo-content">
                 <div class="code-container">
                     <label class="code-label" for="jquery-js-1">JavaScript Code:</label>
-                    <textarea class="code-textarea" id="jquery-js-1" data-type="js">// Web-IDE-Bridge Demo - JavaScript
+                    <textarea class="code-textarea" id="jquery-js-1" data-language="js">// Web-IDE-Bridge Demo - JavaScript
 function calculateFibonacci(n) {
     if (n <= 1) {
         return n;
@@ -528,11 +528,11 @@ console.log('Fibonacci sequence:');
 for (let i = 0; i < 10; i++) {
     console.log(`F(${i}) = ${calculateFibonacci(i)}`);
 }</textarea>
-                    <button class="edit-in-ide-btn" data-textarea-id="jquery-js-1" data-file-type="js">Edit in IDE ↗</button>
+                    <button class="edit-in-ide-btn" data-textarea-id="jquery-js-1">Edit in IDE ↗</button>
                 </div>
                 <div class="code-container">
                     <label class="code-label" for="jquery-html-2">HTML Template:</label>
-                    <textarea class="code-textarea" id="jquery-html-2" data-type="html"><!-- Web-IDE-Bridge Demo - HTML -->
+                    <textarea class="code-textarea" id="jquery-html-2" data-language="html"><!-- Web-IDE-Bridge Demo - HTML -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -569,7 +569,7 @@ for (let i = 0; i < 10; i++) {
     </div>
 </body>
 </html></textarea>
-                    <button class="edit-in-ide-btn" data-textarea-id="jquery-html-2" data-file-type="html">Edit in IDE ↗</button>
+                    <button class="edit-in-ide-btn" data-textarea-id="jquery-html-2">Edit in IDE ↗</button>
                 </div>
             </div>
         </div>
@@ -735,13 +735,35 @@ for (let i = 0; i < 10; i++) {
             updateSessionStatus('active', `User: ${user}, Reconnect: ${reconnectTime}ms`);
             if (!webIdeBridge) {
                 webIdeBridge = new WebIdeBridge(user, {
-                    serverUrl: wsUrl,
-                    reconnectInterval: reconnectTime,
-                    autoReconnect: true,
-                    debug: true,
-                    connectionId: connectionId,
-                    addButtons: false
+                    // Deliberate overrides (not defaults)
+                    serverUrl:          wsUrl,          // default 'ws://localhost:8071/web-ide-bridge/ws'
+                    connectionId:       connectionId,   // default auto-generated
+                    reconnectInterval:  reconnectTime,  // default 5000
+                    addButtons:         false,          // default true
+                    debug:              true,           // default false
+
+                    // All other options with defaults
+                    autoReconnect:      true,
+                    maxReconnectAttempts: 10,
+                    heartbeatInterval:  30000,
+                    connectionTimeout:  10000
                 });
+
+                // Note: autoInjectButtons options not used here since addButtons: false
+                // But here are the available option:
+                // webIdeBridge.autoInjectButtons({
+                //     selector:              'textarea',
+                //     buttonText:            'Edit in IDE ↗',
+                //     buttonClass:           'web-ide-bridge-btn',
+                //     position:              'after',     // 'before', 'after', 'append'
+                //     fileTypeAttribute:     'data-language',
+                //     defaultFileType:       'txt',
+                //     excludeSelector:       '.web-ide-bridge-exclude',
+                //     includeOnlySelector:   null,
+                //     watchForChanges:       true,
+                //     style:                 'modern'     // 'modern', 'minimal'
+                // });
+
                 webIdeBridge.onStatusChange((status) => {
                     isConnected = status.serverConnected;
                     updateBrowserServerStatus(status.serverConnected);
@@ -799,7 +821,7 @@ for (let i = 0; i < 10; i++) {
             return;
         }
         const textareaId = $(this).data('textarea-id');
-        const fileType = $(this).data('file-type') || $('#' + textareaId).attr('data-type') || 'txt';
+        const fileType = $('#' + textareaId).data('language') || 'txt';
         const textarea = document.getElementById(textareaId);
         if (!textarea) {
             logActivity(`Textarea ${textareaId} not found`, 'error');

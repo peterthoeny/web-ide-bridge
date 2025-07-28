@@ -481,7 +481,7 @@
             <div class="edit-demo-content">
                 <div class="code-container">
                     <label class="code-label" for="javascript-123">JavaScript Code:</label>
-                    <textarea class="code-textarea" id="javascript-123" data-type="js">// Web-IDE-Bridge Demo - JavaScript
+                    <textarea class="code-textarea" id="javascript-123" data-language="js">// Web-IDE-Bridge Demo - JavaScript
 function calculateFibonacci(n) {
     if (n <= 1) {
         return n;
@@ -506,7 +506,7 @@ for (let i = 0; i < 10; i++) {
 
                 <div class="code-container">
                     <label class="code-label" for="html-456">HTML Template:</label>
-                    <textarea class="code-textarea" id="html-456" data-type="html"><!-- Web-IDE-Bridge Demo - HTML -->
+                    <textarea class="code-textarea" id="html-456" data-language="html"><!-- Web-IDE-Bridge Demo - HTML -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -747,12 +747,32 @@ for (let i = 0; i < 10; i++) {
                 // Initialize Web-IDE-Bridge with user as userId and persistent connectionId
                 if (!webIdeBridge) {
                     webIdeBridge = new WebIdeBridge(user, {
-                        serverUrl: wsUrl,
-                        reconnectInterval: reconnectTime,
-                        autoReconnect: true,
-                        debug: true,
-                        connectionId: connectionId,
-                        addButtons: true
+                        // Deliberate overrides (not defaults)
+                        serverUrl:          wsUrl,          // default 'ws://localhost:8071/web-ide-bridge/ws'
+                        connectionId:       connectionId,   // default auto-generated
+                        reconnectInterval:  reconnectTime,  // default 5000
+                        addButtons:         true,           // default true
+                        debug:              true,           // default false
+
+                        // All other options with defaults
+                        autoReconnect:      true,
+                        maxReconnectAttempts: 10,
+                        heartbeatInterval:  30000,
+                        connectionTimeout:  10000
+                    });
+
+                    // Additional autoInjectButtons options with defaults (when addButtons: true)
+                    webIdeBridge.autoInjectButtons({
+                        selector:              'textarea',
+                        buttonText:            'Edit in IDE ↗',
+                        buttonClass:           'web-ide-bridge-btn',
+                        position:              'after',     // 'before', 'after', 'append'
+                        fileTypeAttribute:     'data-language',
+                        defaultFileType:       'txt',
+                        excludeSelector:       '.web-ide-bridge-exclude',
+                        includeOnlySelector:   null,
+                        watchForChanges:       true,
+                        style:                 'modern'     // 'modern', 'minimal'
                     });
 
                     // Set up event handlers (only once)
