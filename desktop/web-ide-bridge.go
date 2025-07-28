@@ -37,54 +37,17 @@ import (
 
 // Version variables that can be set via build flags
 var (
-	Version = "dev" // Default version, can be overridden at build time
+	Version = "1.1.1" // Default version, can be overridden at build time
 )
 
-// getVersion returns the version string, trying multiple sources
+// getVersion returns the version string
 func getVersion() string {
-	// If version was set via build flags, use it
-	if Version != "dev" {
-		return Version
-	}
-
-	// Try to read from package.json in the project root
-	if version := readVersionFromPackageJSON(); version != "" {
-		return version
-	}
-
-	// Fallback to default
-	return "dev"
+	return Version
 }
 
-// readVersionFromPackageJSON reads version from the root package.json
-func readVersionFromPackageJSON() string {
-	// Try to find package.json in the project root (relative to desktop directory)
-	packageJSONPath := filepath.Join("..", "package.json")
 
-	// If we're running from desktop directory, go up one level
-	if _, err := os.Stat(packageJSONPath); os.IsNotExist(err) {
-		// Try current directory (if running from project root)
-		packageJSONPath = "package.json"
-	}
-
-	data, err := os.ReadFile(packageJSONPath)
-	if err != nil {
-		return ""
-	}
-
-	var pkg struct {
-		Version string `json:"version"`
-	}
-
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return ""
-	}
-
-	return pkg.Version
-}
 
 //go:embed web-ide-bridge.conf
-var _ embed.FS // keep linter from removing
 var embeddedConfig []byte
 
 //go:embed assets/*
@@ -122,9 +85,17 @@ func defaultConfig() Config {
 
 	appCfg, _ := loadAppConfig()
 	fmt.Printf("[DEBUG] Loaded org config: ws_url=%q, ides=%v\n", appCfg.WSURL, appCfg.DefaultIDEs)
+
+	// Use environment variable as highest priority, then config file, then default
 	wsURL := "ws://localhost:8071/web-ide-bridge/ws" // fallback default
-	if appCfg.WSURL != "" {
+	if envURL := os.Getenv("WEB_IDE_BRIDGE_WS_URL"); envURL != "" {
+		wsURL = envURL
+		fmt.Printf("[DEBUG] Using WebSocket URL from environment: %s\n", wsURL)
+	} else if appCfg.WSURL != "" {
 		wsURL = appCfg.WSURL
+		fmt.Printf("[DEBUG] Using WebSocket URL from config: %s\n", wsURL)
+	} else {
+		fmt.Printf("[DEBUG] Using default WebSocket URL: %s\n", wsURL)
 	}
 	ide := "TextEdit"
 	if runtime.GOOS == "darwin" {
@@ -272,12 +243,17 @@ func loadAppConfig() (AppConfig, error) {
 	}
 	// Fallback: use embedded config if present
 	if len(embeddedConfig) > 0 {
+		fmt.Printf("[DEBUG] Using embedded config, size: %d bytes\n", len(embeddedConfig))
 		var fullConfig FullAppConfig
 		if err := json.Unmarshal(embeddedConfig, &fullConfig); err == nil {
 			config = fullConfig.Defaults
 			config.TempFileCleanupHours = fullConfig.TempFileCleanupHours
 			return config, nil
+		} else {
+			fmt.Printf("[DEBUG] Failed to parse embedded config: %v\n", err)
 		}
+	} else {
+		fmt.Printf("[DEBUG] No embedded config found (length: %d)\n", len(embeddedConfig))
 	}
 	return config, nil // empty config if not found
 }

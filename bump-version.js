@@ -114,6 +114,12 @@ const filesToUpdate = [
     patterns: [
       { from: /expect\(data\.version\)\.toBe\('[\d.]+'\)/g, to: `expect(data.version).toBe('${newVersion}')` }
     ]
+  },
+  {
+    file: 'desktop/web-ide-bridge.go',
+    patterns: [
+      { from: /Version = "[\d.]+"/, to: `Version = "${newVersion}"` }
+    ]
   }
 ];
 

@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.1.0
+# Web-IDE-Bridge v1.1.1
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.1-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -287,7 +287,10 @@ go run web-ide-bridge.go
 # Or build for your current platform only
 cd desktop
 go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
-# Note: on Windows add this before the -o flag: -ldflags "-H=windowsgui"
+
+# Or build for Windows if Windows is your current platform
+cd desktop
+go build -ldflags "-H=windowsgui" -o ../bin/$(go env GOOS)_$(go env GOARCH)/Web-IDE-Bridge.exe web-ide-bridge.go
 
 # Or build for a specific platform
 cd desktop
