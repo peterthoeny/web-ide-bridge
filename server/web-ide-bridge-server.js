@@ -716,7 +716,7 @@ class WebIdeBridgeServer {
 
     if (this.config.debug) {
       // Include code snippet in debug mode
-      let processedCode = code.replace(/\n/g, '\\n');
+      let processedCode = code.replace(/\r/g, '').replace(/\n/g, '\\n');
       if (processedCode.length > 100) {
         processedCode = `${processedCode.substring(0, 100)}...${processedCode.substring(processedCode.length - 20)}`;
       }
@@ -1831,8 +1831,8 @@ class WebIdeBridgeServer {
     if (data && typeof data === 'object' && data.code) {
       let processedCode = data.code;
 
-      // Replace newlines with \n for single-line logging
-      processedCode = processedCode.replace(/\n/g, '\\n');
+      // Replace newlines with \n for single-line logging (handle both CRLF and LF)
+      processedCode = processedCode.replace(/\r/g, '').replace(/\n/g, '\\n');
 
       // Truncate if too long
       if (processedCode.length > 120 && this.config.debug) {
