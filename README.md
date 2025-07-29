@@ -299,31 +299,37 @@ go run web-ide-bridge.go
 ```
 
 **Production Build:**
+
+Cross-compilation is not possible for GUI applications with native dependencies. For multi-platform releases, do a manually build on each platform, or use CI/CD with multiple runners.
+
+**Automatic Procution Build for Current Platform Only (recommended)**
+
 ```bash
-# Build for all platforms (recommended)
 ./build.sh
-
-# Or run directly (development)
-cd desktop
-go run web-ide-bridge.go
-
-# Or build for your current platform only
-cd desktop
-go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge.go
-
-# Or build for Windows if Windows is your current platform
-cd desktop
-go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
-
-# Or build for a specific platform
-cd desktop
-GOOS=darwin GOARCH=amd64 go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
-GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
-
-# The app will automatically use platform-specific icons from the assets/ directory
 ```
 
-Note for Windows build: If the File Explorer does not show the application icon with the red bridge, do this:
+**Manual Production Build on macOS Intel:**
+
+```bash
+cd desktop
+go build -o ../bin/darwin_amd64/web-ide-bridge web-ide-bridge.go
+```
+
+**Manual Production Build on macOS Apple Silicon:**
+
+```bash
+cd desktop
+go build -o ../bin/darwin_arm64/web-ide-bridge web-ide-bridge.go
+```
+
+**Manual Production Build on Windows:**
+
+```bash
+cd desktop
+go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
+```
+
+Note: If the File Explorer does not show the application icon with the red bridge, do this:
 - Download and install http://www.angusj.com/resourcehacker/ (a free and lightweight GUI-based resource editor)
 - Open Resource Hacker
   - File → Open → select `bin/windows_amd64/Web-IDE-Bridge.exe`
@@ -331,30 +337,22 @@ Note for Windows build: If the File Explorer does not show the application icon 
   - Browse to `desktop/assets/favicon.ico`
   - File → Save
 
-#### All Components
+**Manual Production Build on Linux:**
 
 ```bash
-# Build all components at once
-npm run build
+cd desktop
+go build -o ../bin/linux_amd64/web-ide-bridge web-ide-bridge.go
 ```
-
-**Build Outputs:**
-- `bin/darwin_amd64/web-ide-bridge` - macOS Intel (✅ builds successfully)
-- `bin/darwin_arm64/web-ide-bridge` - macOS Apple Silicon (⚠️ cross-compilation constraints)
-- `bin/linux_amd64/web-ide-bridge` - Linux Intel/AMD (⚠️ cross-compilation constraints)
-- `bin/windows_amd64/web-ide-bridge.exe` - Windows Intel/AMD (⚠️ cross-compilation constraints)
-
-**Note:** GUI applications with native dependencies (like Fyne) have cross-compilation constraints. The build script will attempt all platforms but may only succeed for the current platform.
-
-**macOS App Bundle:** The build script also creates a proper `bin/darwin_amd64/Web-IDE-Bridge.app` bundle that appears correctly in Command+Tab and the dock. This requires the Fyne CLI tool to be installed and available in your PATH (see Go Tools Setup above).
 
 **Distribution:**
 ```bash
 # Create platform-specific release packages
 zip -r web-ide-bridge-darwin-amd64.zip bin/darwin_amd64/
+zip -r web-ide-bridge-darwin-arm64.zip bin/darwin_arm64/
 zip -r web-ide-bridge-linux-amd64.zip bin/linux_amd64/
 zip -r web-ide-bridge-windows-amd64.zip bin/windows_amd64/
-zip -r web-ide-bridge-macos-app.zip bin/darwin_amd64/Web-IDE-Bridge.app/  # macOS app bundle
+zip -r web-ide-bridge-macos-app-amd64.zip bin/darwin_amd64/Web-IDE-Bridge.app/  # macOS Intel app bundle
+zip -r web-ide-bridge-macos-app-arm64.zip bin/darwin_arm64/Web-IDE-Bridge.app/  # macOS Apple Silicon app bundle
 ```
 
 ### Version Management
