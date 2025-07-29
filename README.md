@@ -35,7 +35,6 @@ web-ide-bridge/
 ├── package.json                    # Root package configuration
 ├── package-lock.json               # Locked dependencies
 ├── .gitignore                      # Git ignore patterns
-├── build.sh                        # Cross-platform build script
 ├── bump-version.js                 # Version bump automation script
 ├── developer_context.md            # Technical implementation guide
 ├── browser/                        # Browser component
@@ -62,6 +61,7 @@ web-ide-bridge/
 │       └── favicon.ico                     # Favicon for status page
 ├── desktop/                        # Desktop component
 │   ├── README.md                       # Notes
+│   ├── build.sh                        # Build script for desktop application
 │   ├── web-ide-bridge.conf             # Desktop app/org config (JSON)
 │   ├── web-ide-bridge.go               # Main Go application (desktop app)
 │   ├── go.mod                          # Go module definition
@@ -185,8 +185,6 @@ npm start -- --config /path/to/config.conf
 
 ### 3. Run Tests
 
-
-
 #### **Recommended Test Commands:**
 
 ```bash
@@ -302,11 +300,14 @@ go run web-ide-bridge.go
 
 Cross-compilation is not possible for GUI applications with native dependencies. For multi-platform releases, do a manually build on each platform, or use CI/CD with multiple runners.
 
-**Automatic Procution Build for Current Platform Only (recommended)**
+**Automatic Production Build for Current Platform Only (macOS/Linux)**
 
 ```bash
+cd desktop
 ./build.sh
 ```
+
+**Note:** The `build.sh` script is for macOS and Linux only. Windows users should use the manual build commands below.
 
 **Manual Production Build on macOS Intel:**
 
@@ -329,9 +330,15 @@ cd desktop
 go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
 ```
 
-Note: If the File Explorer does not show the application icon with the red bridge, do this:
-- Download and install http://www.angusj.com/resourcehacker/ (a free and lightweight GUI-based resource editor)
-- Open Resource Hacker
+**Windows Build Notes:**
+- The `build.sh` script is not available on Windows (bash script)
+- Use the manual Go build command above
+- The `-ldflags "-H=windowsgui"` flag creates a Windows GUI application (no console window)
+- No app bundle creation on Windows (Windows uses .exe files directly)
+- If the File Explorer does not show the application icon with the red bridge, do this:
+  - Download and install http://www.angusj.com/resourcehacker/
+    (a free and lightweight GUI-based resource editor)
+  - Open Resource Hacker
   - File → Open → select `bin/windows_amd64/Web-IDE-Bridge.exe`
   - Action → Add a new Resource → Icon
   - Browse to `desktop/assets/favicon.ico`
@@ -347,12 +354,12 @@ go build -o ../bin/linux_amd64/web-ide-bridge web-ide-bridge.go
 **Distribution:**
 ```bash
 # Create platform-specific release packages
-zip -r web-ide-bridge-darwin-amd64.zip bin/darwin_amd64/
-zip -r web-ide-bridge-darwin-arm64.zip bin/darwin_arm64/
-zip -r web-ide-bridge-linux-amd64.zip bin/linux_amd64/
-zip -r web-ide-bridge-windows-amd64.zip bin/windows_amd64/
-zip -r web-ide-bridge-macos-app-amd64.zip bin/darwin_amd64/Web-IDE-Bridge.app/  # macOS Intel app bundle
-zip -r web-ide-bridge-macos-app-arm64.zip bin/darwin_arm64/Web-IDE-Bridge.app/  # macOS Apple Silicon app bundle
+zip    bin/web-ide-bridge-darwin-amd64.zip  bin/darwin_amd64/web-ide-bridge
+zip -r bin/Web-IDE-Bridge-App-amd64.zip     bin/darwin_amd64/Web-IDE-Bridge.app/ # macOS Intel app bundle
+zip    bin/web-ide-bridge-darwin-arm64.zip  bin/darwin_arm64/web-ide-bridge
+zip -r bin/Web-IDE-Bridge-App-arm64.zip     bin/darwin_arm64/Web-IDE-Bridge.app/ # macOS Apple Silicon app
+zip    bin/web-ide-bridge-linux-amd64.zip   bin/linux_amd64/web-ide-bridge
+zip    bin/Web-IDE-Bridge-windows-amd64.zip bin/windows_amd64/Web-IDE-Bridge.exe
 ```
 
 ### Version Management
