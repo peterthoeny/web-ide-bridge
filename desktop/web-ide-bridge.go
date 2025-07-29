@@ -324,7 +324,13 @@ func (c *WebSocketClient) RestartWithConfig(newConfig Config) {
 	activeWatchers := c.getActiveWatchers()
 
 	c.Close() // Close the current connection and stop all watchers
+
+	// Update configuration with proper synchronization
+	c.statusMu.Lock()
 	c.cfg = newConfig
+	c.statusMu.Unlock()
+
+	c.log(fmt.Sprintf("Updated IDE command to: %s", newConfig.IDECommand))
 	c.Start() // Start a new connection
 
 	// Restore watchers after connection is established
@@ -339,8 +345,13 @@ func (c *WebSocketClient) RestartWithConfig(newConfig Config) {
 // Main connection loop: handles connect, reconnect, and cleanup
 func (c *WebSocketClient) connectLoop() {
 	for {
-		c.log("Connecting to " + c.cfg.WebSocket)
-		conn, _, err := websocket.DefaultDialer.Dial(c.cfg.WebSocket, nil)
+		// Get current configuration with proper synchronization
+		c.statusMu.Lock()
+		currentCfg := c.cfg
+		c.statusMu.Unlock()
+
+		c.log("Connecting to " + currentCfg.WebSocket)
+		conn, _, err := websocket.DefaultDialer.Dial(currentCfg.WebSocket, nil)
 		if err != nil {
 			c.setStatus("disconnected")
 			c.log("Failed to connect to server: " + err.Error())
@@ -352,13 +363,13 @@ func (c *WebSocketClient) connectLoop() {
 		// Send desktop_connect message to server
 		desktopConnectMsg := map[string]interface{}{
 			"type":         "desktop_connect",
-			"connectionId": c.cfg.ConnectionID,
-			"userId":       c.cfg.UserID,
+			"connectionId": currentCfg.ConnectionID,
+			"userId":       currentCfg.UserID,
 			"timestamp":    time.Now().UnixMilli(),
 		}
 		if data, err := json.Marshal(desktopConnectMsg); err == nil {
 			c.conn.WriteMessage(websocket.TextMessage, data)
-			c.log("Registered with server as user: " + c.cfg.UserID)
+			c.log("Registered with server as user: " + currentCfg.UserID)
 		} else {
 			c.log("Failed to register with server: " + err.Error())
 		}
@@ -456,17 +467,22 @@ func (c *WebSocketClient) handleEditRequest(snippetId, code, fileType string) {
 	sanitizedId := sanitizeSnippetId(snippetId)
 	tmpFile := filepath.Join(tmpDir, "web-"+sanitizedId+"."+fileType)
 
-	// Debug log (not shown in activity log)
-	log.Printf("[handleEditRequest] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code))
+	// Get current configuration with proper synchronization
+	c.statusMu.Lock()
+	currentCfg := c.cfg
+	c.statusMu.Unlock()
 
-	c.log(fmt.Sprintf("Saving code snippet %s to temp file, and launching IDE %s", snippetId, c.cfg.IDECommand))
+	// Debug log (not shown in activity log)
+	log.Printf("[handleEditRequest] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", currentCfg.UserID, snippetId, fileType, len(code))
+
+	c.log(fmt.Sprintf("Saving code snippet %s to temp file, and launching IDE %s", snippetId, currentCfg.IDECommand))
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
 		c.log("Failed to save code snippet to temp file: " + err.Error())
 		return
 	}
 
 	var cmd *exec.Cmd
-	ideCmd := c.cfg.IDECommand
+	ideCmd := currentCfg.IDECommand
 	if runtime.GOOS == "darwin" {
 		if strings.HasSuffix(ideCmd, ".app") {
 			// Extract app name from path, e.g., /Applications/TextEdit.app -> TextEdit
@@ -644,12 +660,17 @@ func (c *WebSocketClient) restoreWatchers(watchers map[string]string) {
 
 // Send code update to server
 func (c *WebSocketClient) sendCodeUpdate(snippetId, code, fileType string) {
+	// Get current configuration with proper synchronization
+	c.statusMu.Lock()
+	currentCfg := c.cfg
+	c.statusMu.Unlock()
+
 	// Debug log (not shown in activity log)
-	log.Printf("[sendCodeUpdate] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", c.cfg.UserID, snippetId, fileType, len(code))
+	log.Printf("[sendCodeUpdate] userId=%s, snippetId=%s, fileType=%s, codeLength=%d", currentCfg.UserID, snippetId, fileType, len(code))
 	msg := map[string]interface{}{
 		"type":         "code_update",
-		"connectionId": c.cfg.ConnectionID,
-		"userId":       c.cfg.UserID,
+		"connectionId": currentCfg.ConnectionID,
+		"userId":       currentCfg.UserID,
 		"snippetId":    snippetId,
 		"code":         code,
 		"fileType":     fileType,
@@ -1025,7 +1046,9 @@ func main() {
 						wsVal.SetText(cfg.WebSocket)
 						ideVal.SetText(cfg.IDECommand)
 						go func() {
-							appendLog("Restarting connection with new configuration...")
+							appendLog("Re-initializing app with new configuration...")
+							// Re-initialize the configuration similar to app restart
+							// This ensures the new IDE command is properly used
 							wsClient.RestartWithConfig(cfg)
 						}()
 					}
