@@ -313,7 +313,7 @@ go build -o ../bin/$(go env GOOS)_$(go env GOARCH)/web-ide-bridge web-ide-bridge
 
 # Or build for Windows if Windows is your current platform
 cd desktop
-go build -ldflags "-H=windowsgui" -o ../bin/$(go env GOOS)_$(go env GOARCH)/Web-IDE-Bridge.exe web-ide-bridge.go
+go build -ldflags "-H=windowsgui" -o ../bin/windows_amd64/Web-IDE-Bridge.exe web-ide-bridge.go
 
 # Or build for a specific platform
 cd desktop
@@ -322,6 +322,14 @@ GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o ../bin/windows_am
 
 # The app will automatically use platform-specific icons from the assets/ directory
 ```
+
+Note for Windows build: If the File Explorer does not show the application icon with the red bridge, do this:
+- Download and install http://www.angusj.com/resourcehacker/ (a free and lightweight GUI-based resource editor)
+- Open Resource Hacker
+  - File → Open → select `bin/windows_amd64/Web-IDE-Bridge.exe`
+  - Action → Add a new Resource → Icon
+  - Browse to `desktop/assets/favicon.ico`
+  - File → Save
 
 #### All Components
 
