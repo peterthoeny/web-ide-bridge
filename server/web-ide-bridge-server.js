@@ -31,6 +31,7 @@ class WebIdeBridgeServer {
     this.desktopConnections = new Map(); // connectionId -> {ws, userId}
     this.userSessions = new Map();       // userId -> {browserIds: Set, desktopId}
     this.activeSessions = new Map();     // sessionId -> {userId, snippetId, browserConnectionId}
+    this.statusPageConnections = new Set(); // Track all status page WebSocket connections
 
     // Rate limiting store
     this.rateLimitStore = new Map();
@@ -42,6 +43,7 @@ class WebIdeBridgeServer {
     // Cleanup intervals
     this.cleanupInterval = null;
     this.heartbeatInterval = null;
+    this.statusUpdateInterval = null; // Single interval for all status pages
 
     // Shutdown state tracking
     this.isShuttingDown = false;
@@ -274,7 +276,7 @@ class WebIdeBridgeServer {
     }
 
     // Validate message type
-    const validTypes = ['browser_connect', 'desktop_connect', 'edit_request', 'code_update', 'ping', 'connection_init', 'info'];
+    const validTypes = ['browser_connect', 'desktop_connect', 'status_connect', 'connection_init', 'edit_request', 'code_update', 'ping', 'info'];
     if (!validTypes.includes(message.type)) {
       return { valid: false, error: `Unknown message type: ${message.type}` };
     }
@@ -573,6 +575,9 @@ class WebIdeBridgeServer {
           case 'info':
             this.handleInfoMessage(ws, message);
             break;
+          case 'status_connect':
+            this.handleStatusConnect(ws, message);
+            break;
           default:
             this.sendError(ws, `Unknown message type: ${message.type}`);
         }
@@ -767,11 +772,15 @@ class WebIdeBridgeServer {
       if (userSession && userSession.desktopId) {
         const desktopConn = this.desktopConnections.get(userSession.desktopId);
         if (desktopConn) {
+          const errorMsg = 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.';
           this.sendMessage(desktopConn.ws, {
             type: 'info',
             snippetId: snippetId,
-            message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
+            message: errorMsg
           });
+
+          // Log to server log and activity log
+          this._log(`Code update could not be sent to web application for user ${userId}, snippetId: ${snippetId}`, 'warning');
         }
       }
       this.sendError(ws, 'Error: Edit session expired. Please try editing the code snippet again.');
@@ -795,11 +804,15 @@ class WebIdeBridgeServer {
       // Send info message to desktop
       const desktopConn = this.desktopConnections.get(session.desktopConnectionId);
       if (desktopConn) {
+        const errorMsg = 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.';
         this.sendMessage(desktopConn.ws, {
           type: 'info',
           snippetId: session.snippetId,
-          message: 'Error: Code update could not be sent to web application. Please make sure the web page is open and in edit mode, then try saving again.'
+          message: errorMsg
         });
+
+        // Log to server log and activity log
+        this._log(`Code update failed: No browser connections for user ${userId}, snippetId: ${session.snippetId}`, 'warning');
       }
       // Do not treat as error, just return
       return;
@@ -851,6 +864,9 @@ class WebIdeBridgeServer {
           message: message
         });
 
+        // Log to server log and activity log
+        this._log(`Code update failed: ${message} for user ${userId}, snippetId: ${session.snippetId}`, 'warning');
+
         if (this.config.debug) {
           this._log(`Notified desktop: ${message}`);
         }
@@ -890,10 +906,68 @@ class WebIdeBridgeServer {
     });
   }
 
+
+
+  /**
+   * Handle status_connect message from status page
+   */
+  handleStatusConnect(ws, message) {
+    // Mark this connection as a status page
+    ws.isStatusPage = true;
+
+    // Add to status page connections set
+    this.statusPageConnections.add(ws);
+
+    // Start the shared status update interval if it's not already running
+    if (!this.statusUpdateInterval) {
+      this.statusUpdateInterval = setInterval(() => {
+        this.broadcastStatusToAllPages();
+      }, 1000); // Send status updates every second
+    }
+
+    // Send initial status immediately
+    const statusData = this.generateStatusData();
+    this.sendMessage(ws, {
+      type: 'status',
+      data: statusData,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Broadcast status to all status page connections
+   */
+  broadcastStatusToAllPages() {
+    const statusData = this.generateStatusData();
+    const message = {
+      type: 'status',
+      data: statusData,
+      timestamp: Date.now()
+    };
+
+    // Send to all status page connections
+    for (const ws of this.statusPageConnections) {
+      if (ws.readyState === WebSocket.OPEN) {
+        this.sendMessage(ws, message);
+      }
+    }
+  }
+
   /**
    * Handle WebSocket disconnection
    */
   handleDisconnection(ws, code, reason) {
+    // Clean up status page connection
+    if (ws.isStatusPage) {
+      this.statusPageConnections.delete(ws);
+
+      // If no more status pages are connected, stop the interval
+      if (this.statusPageConnections.size === 0 && this.statusUpdateInterval) {
+        clearInterval(this.statusUpdateInterval);
+        this.statusUpdateInterval = null;
+      }
+    }
+
     // Remove from browser connections
     if (this.browserConnections.has(ws.connectionId)) {
       const browserConn = this.browserConnections.get(ws.connectionId);
@@ -1004,8 +1078,7 @@ class WebIdeBridgeServer {
     // Get activity log entries
     const activityLogEntries = this.getActivityLogEntries(15);
 
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1259,8 +1332,8 @@ class WebIdeBridgeServer {
                 <h1 class="title">Web-IDE-Bridge Server</h1>
                 <div class="version">v${VERSION}</div>
             </div>
-            <p class="subtitle">WebSocket relay server for seamless IDE integration</p>
-            <div class="status-badge">${connectionStatus}</div>
+            <p class="subtitle">WebSocket relay server for seamless integration between web applications and IDEs</p>
+            <div class="status-badge" id="status-badge">${connectionStatus}</div>
         </div>
 
         <div class="grid">
@@ -1269,19 +1342,19 @@ class WebIdeBridgeServer {
                 <div class="card-content">
                     <div class="metric">
                         <span class="metric-label">Browser Clients</span>
-                        <span class="metric-value number">${this.browserConnections.size}</span>
+                        <span class="metric-value number" id="browser-clients"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Desktop Clients</span>
-                        <span class="metric-value number">${this.desktopConnections.size}</span>
+                        <span class="metric-value number" id="desktop-clients"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Total Connected</span>
-                        <span class="metric-value number">${this.browserConnections.size + this.desktopConnections.size}</span>
+                        <span class="metric-value number" id="total-connected"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Total Since Start</span>
-                        <span class="metric-value number">${this.metrics.totalConnections}</span>
+                        <span class="metric-value number" id="total-since-start"></span>
                     </div>
                 </div>
             </div>
@@ -1291,15 +1364,15 @@ class WebIdeBridgeServer {
                 <div class="card-content">
                     <div class="metric">
                         <span class="metric-label">Active Users</span>
-                        <span class="metric-value number">${this.userSessions.size}</span>
+                        <span class="metric-value number" id="active-users"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Active Edit Sessions</span>
-                        <span class="metric-value number">${this.activeSessions.size}</span>
+                        <span class="metric-value number" id="active-edit-sessions"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Total Sessions</span>
-                        <span class="metric-value number">${this.metrics.totalSessions}</span>
+                        <span class="metric-value number" id="total-sessions"></span>
                     </div>
                 </div>
             </div>
@@ -1309,19 +1382,19 @@ class WebIdeBridgeServer {
                 <div class="card-content">
                     <div class="metric">
                         <span class="metric-label">Uptime</span>
-                        <span class="metric-value">${uptimeFormatted}</span>
+                        <span class="metric-value" id="uptime"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Messages Processed</span>
-                        <span class="metric-value number">${this.metrics.messagesProcessed}</span>
+                        <span class="metric-value number" id="messages-processed"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Memory Used</span>
-                        <span class="metric-value">${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB</span>
+                        <span class="metric-value" id="memory-used"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Errors</span>
-                        <span class="metric-value number">${this.metrics.errors}</span>
+                        <span class="metric-value number" id="errors"></span>
                     </div>
                 </div>
             </div>
@@ -1331,56 +1404,248 @@ class WebIdeBridgeServer {
                 <div class="card-content">
                     <div class="metric">
                         <span class="metric-label">Environment</span>
-                        <span class="metric-value">${this.config.environment}</span>
+                        <span class="metric-value" id="environment"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">WebSocket Path</span>
-                        <span class="metric-value">${this.wsOptions.path}</span>
+                        <span class="metric-value" id="websocket-path"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Max Connections</span>
-                        <span class="metric-value number">${this.config.server.maxConnections}</span>
+                        <span class="metric-value number" id="max-connections"></span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Debug Mode</span>
-                        <span class="metric-value">${this.config.debug ? '✅ Enabled' : '❌ Disabled'}</span>
+                        <span class="metric-value" id="debug-mode"></span>
                     </div>
                 </div>
             </div>
 
             <div class="card activity-log">
                 <h2 class="card-title">📋 Activity Log</h2>
-                <div class="card-content">
-                    ${activityLogEntries.length > 0 ? 
-                        activityLogEntries.map(entry => `
-                            <div class="log-entry ${entry.type}">
-                                <span class="log-time">${entry.time}</span>
-                                <span class="log-message">${entry.message}</span>
-                            </div>
-                        `).join('') : 
-                        '<div class="log-entry info"><span class="log-message">No activity yet</span></div>'
-                    }
+                <div class="card-content" id="activity-log">
+                    <div class="log-entry info"><span class="log-message">Loading...</span></div>
                 </div>
             </div>
         </div>
 
         <div class="footer">
             <p>
-                <a href="${this.config.endpoints?.health || '/web-ide-bridge/health'}">Health Check</a>
-                ${this.config.debug ? `<a href="${this.config.endpoints?.debug || '/web-ide-bridge/debug'}">Debug Info</a>` : ''}
+                <a id="health-link" href="#">Health Check</a>
+                <a id="debug-link" href="#" style="display: none;">Debug Info</a>
                 <a href="https://github.com/peterthoeny/web-ide-bridge">GitHub</a>
             </p>
             <p style="margin-top: 0.5rem;">
-                Server started: ${new Date(this.metrics.startTime).toLocaleString()}
+                Server started: <span id="server-start-time"></span>
             </p>
         </div>
     </div>
 
     <script>
-        // Auto-refresh every 30 seconds
-        setTimeout(() => {
-            window.location.reload();
-        }, 30000);
+        // WebSocket-based real-time status updates
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectInterval = 10000; // Reconnect every 10 seconds
+        let connectionId = null;
+        let lastStatusTime = 0;
+        let statusTimeoutTimer = null;
+        const STATUS_TIMEOUT = 10000; // 10 seconds timeout for status updates
+
+        // Get WebSocket URL from current page
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/web-ide-bridge/ws';
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function() {
+                    console.log('WebSocket connected for status updates');
+                    reconnectAttempts = 0;
+                    updateConnectionStatus('active');
+
+                    // Send connection init with a unique ID
+                    const statusConnectionId = 'status-page-' + Date.now();
+                    ws.send(JSON.stringify({
+                        type: 'connection_init',
+                        connectionId: statusConnectionId
+                    }));
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'status') {
+                            lastStatusTime = Date.now();
+                            updateStatusDisplay(message.data);
+                            updateConnectionStatus('active');
+
+                            // Reset timeout timer
+                            if (statusTimeoutTimer) {
+                                clearTimeout(statusTimeoutTimer);
+                            }
+                            statusTimeoutTimer = setTimeout(() => {
+                                updateConnectionStatus('down');
+                            }, STATUS_TIMEOUT);
+                        } else if (message.type === 'connection_ack') {
+                            connectionId = message.connectionId;
+                            console.log('Connection acknowledged with ID:', connectionId);
+
+                            // Send status_connect to start receiving updates
+                            ws.send(JSON.stringify({
+                                type: 'status_connect',
+                                connectionId: connectionId,
+                                timestamp: Date.now()
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    console.log('WebSocket disconnected:', event.code, event.reason);
+                    updateConnectionStatus('down');
+
+                    // Clear timeout timer
+                    if (statusTimeoutTimer) {
+                        clearTimeout(statusTimeoutTimer);
+                        statusTimeoutTimer = null;
+                    }
+
+                    // Attempt to reconnect
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        setTimeout(connectWebSocket, reconnectInterval);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus('down');
+                };
+
+            } catch (error) {
+                console.error('Error creating WebSocket connection:', error);
+                updateConnectionStatus('down');
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const statusBadge = document.getElementById('status-badge');
+            if (statusBadge) {
+                statusBadge.textContent = status.toUpperCase();
+                if (status === 'active') {
+                    statusBadge.style.backgroundColor = '#10b981';
+                } else if (status === 'waiting') {
+                    statusBadge.style.backgroundColor = '#f59e0b';
+                } else if (status === 'down') {
+                    statusBadge.style.backgroundColor = '#ef4444';
+                }
+            }
+        }
+
+        function updateStatusDisplay(data) {
+            // Update connection status
+            updateConnectionStatus(data.connectionStatus);
+
+            // Update connection metrics
+            updateElement('browser-clients', data.connections.browser);
+            updateElement('desktop-clients', data.connections.desktop);
+            updateElement('total-connected', data.connections.total);
+            updateElement('total-since-start', data.connections.totalSinceStart);
+
+            // Update session metrics
+            updateElement('active-users', data.sessions.users);
+            updateElement('active-edit-sessions', data.sessions.active);
+            updateElement('total-sessions', data.sessions.total);
+
+            // Update performance metrics
+            updateElement('uptime', data.uptime);
+            updateElement('messages-processed', data.performance.messagesProcessed);
+            updateElement('memory-used', data.memoryUsed + ' MB');
+            updateElement('errors', data.performance.errors);
+
+            // Update configuration
+            updateElement('environment', data.configuration.environment);
+            updateElement('websocket-path', data.configuration.websocketPath);
+            updateElement('max-connections', data.configuration.maxConnections);
+            updateElement('debug-mode', data.configuration.debugMode ? '✅ Enabled' : 'Disabled');
+
+            // Update activity log
+            updateActivityLog(data.activityLog);
+
+            // Update server start time
+            updateElement('server-start-time', new Date(data.performance.startTime).toLocaleString());
+
+            // Show/hide debug link based on debug mode
+            const debugLink = document.getElementById('debug-link');
+            if (debugLink) {
+                debugLink.style.display = data.configuration.debugMode ? 'inline' : 'none';
+            }
+        }
+
+        function updateElement(id, value) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function updateActivityLog(activityLog) {
+            const logContainer = document.getElementById('activity-log');
+            if (logContainer) {
+                if (activityLog.length > 0) {
+                    logContainer.innerHTML = activityLog.map(entry => 
+                        '<div class="log-entry ' + entry.type + '">' +
+                        '<span class="log-time">' + entry.time + '</span>' +
+                        '<span class="log-message">' + entry.message + '</span>' +
+                        '</div>'
+                    ).join('');
+                } else {
+                    logContainer.innerHTML = '<div class="log-entry info"><span class="log-message">No activity yet</span></div>';
+                }
+            }
+        }
+
+        // Initialize WebSocket connection when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update footer links to use current page URL
+            updateFooterLinks();
+
+            // Connect to WebSocket
+            connectWebSocket();
+        });
+
+        function updateFooterLinks() {
+            // Get the current page URL
+            const currentUrl = window.location.href;
+
+            // Create health check URL by replacing /status with /health
+            const healthUrl = currentUrl.replace(/\\/status(\\/)?$/, '/health');
+            const healthLink = document.getElementById('health-link');
+            if (healthLink) {
+                healthLink.href = healthUrl;
+            }
+
+            // Create debug info URL by replacing /status with /debug
+            const debugUrl = currentUrl.replace(/\\/status(\\/)?$/, '/debug');
+            const debugLink = document.getElementById('debug-link');
+            if (debugLink) {
+                debugLink.href = debugUrl;
+            }
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (statusTimeoutTimer) {
+                clearTimeout(statusTimeoutTimer);
+            }
+            if (ws) {
+                ws.close();
+            }
+        });
     </script>
 </body>
 </html>`;
@@ -1396,14 +1661,57 @@ class WebIdeBridgeServer {
     const secs = Math.floor(seconds % 60);
 
     if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m`;
+      return days + 'd ' + hours + 'h ' + minutes + 'm';
     } else if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
+      return hours + 'h ' + minutes + 'm ' + secs + 's';
     } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return minutes + 'm ' + secs + 's';
     } else {
-      return `${secs}s`;
+      return secs + 's';
     }
+  }
+
+  /**
+   * Generate status data for WebSocket responses
+   */
+  generateStatusData() {
+    const uptime = process.uptime();
+    const uptimeFormatted = this.formatUptime(uptime);
+    const memoryUsage = process.memoryUsage();
+
+    const connectionStatus = this.browserConnections.size > 0 || this.desktopConnections.size > 0 
+      ? 'active' 
+      : 'waiting';
+
+    return {
+      connectionStatus,
+      uptime: uptimeFormatted,
+      uptimeSeconds: uptime,
+      memoryUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+      connections: {
+        browser: this.browserConnections.size,
+        desktop: this.desktopConnections.size,
+        total: this.browserConnections.size + this.desktopConnections.size,
+        totalSinceStart: this.metrics.totalConnections
+      },
+      sessions: {
+        users: this.userSessions.size,
+        active: this.activeSessions.size,
+        total: this.metrics.totalSessions
+      },
+      performance: {
+        messagesProcessed: this.metrics.messagesProcessed,
+        errors: this.metrics.errors,
+        startTime: new Date(this.metrics.startTime).toISOString()
+      },
+      configuration: {
+        environment: this.config.environment,
+        websocketPath: this.wsOptions.path,
+        maxConnections: this.config.server.maxConnections,
+        debugMode: this.config.debug
+      },
+      activityLog: this.getActivityLogEntries(15)
+    };
   }
 
   /**
@@ -1687,10 +1995,15 @@ class WebIdeBridgeServer {
         this._log('Cleared heartbeat interval');
       }
 
+      if (this.statusUpdateInterval) {
+        clearInterval(this.statusUpdateInterval);
+        this.statusUpdateInterval = null;
+        this._log('Cleared status update interval');
+      }
+
       // Close all WebSocket connections with proper cleanup
       if (this.wss && this.wss.clients) {
-        this._log(`Closing ${this.wss.clients.size} WebSocket connections...`);
-        this._log(`Closing ${this.wss.clients.size} WebSocket connections`, 'info');
+        this._log(`Closing ${this.wss.clients.size} WebSocket connections...`, 'info');
         const closePromises = [];
 
         this.wss.clients.forEach((ws) => {
@@ -1710,7 +2023,6 @@ class WebIdeBridgeServer {
         });
 
         await Promise.all(closePromises);
-        this._log('All WebSocket connections closed');
         this._log('All WebSocket connections closed', 'info');
       }
 
@@ -1767,6 +2079,9 @@ class WebIdeBridgeServer {
       if (this.activeSessions) {
         this.activeSessions.clear();
       }
+      if (this.statusPageConnections) {
+        this.statusPageConnections.clear();
+      }
       if (this.rateLimitStore) {
         this.rateLimitStore.clear();
       }
@@ -1775,7 +2090,6 @@ class WebIdeBridgeServer {
       this.removeProcessHandlers();
 
       this._log('Server shutdown complete');
-      this._log('Server shutdown complete', 'success');
 
       // Give a moment for everything to settle
       await new Promise(resolve => setTimeout(resolve, 100));
