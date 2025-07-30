@@ -1,5 +1,5 @@
 /**
- * Web-IDE-Bridge v1.1.2
+ * Web-IDE-Bridge v1.1.3
  * Browser library for seamless IDE integration
  * 
  * This is the development build with full debugging support.
