@@ -1,6 +1,15 @@
 /**
- * Simple Browser Tests
- * Tests for Web-IDE-Bridge browser library using our custom test runner
+ * @name            Web-IDE-Bridge / Tests / Browser
+ * @tagline         Simple browser tests for Web-IDE-Bridge Browser
+ * @description     Tests for Web-IDE-Bridge browser library using our custom test runner
+ * @file            tests/browser/simple-browser.test.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
  */
 
 // Load the test runner
@@ -110,4 +119,4 @@ describe('WebIdeBridge Browser Library', () => {
 
 // Run the tests
 const { runTests } = require('./browser-test-runner.js');
-runTests(); 
+runTests();

@@ -1,22 +1,38 @@
 #!/usr/bin/env node
 
 /**
- * Web-IDE-Bridge Version Bump Script
- * 
- * Usage: node bump-version.js <new-version>
- * Example: node bump-version.js 1.0.1
+ * @name            Web-IDE-Bridge / Build
+ * @tagline         Version bump script for Web-IDE-Bridge
+ * @description     Updates version numbers and release dates across all source files
+ * @file            bump-version.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const newVersion = process.argv[2];
+const providedDate = process.argv[3];
+const newDate = providedDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
 if (!newVersion) {
   console.error('❌ Please provide a new version number');
-  console.error('Usage: node bump-version.js <new-version>');
+  console.error('Usage: node bump-version.js <new-version> [new-date]');
   console.error('Example: node bump-version.js 1.0.1');
+  console.error('Example: node bump-version.js 1.0.1 2025-01-27');
+  console.error('Note: If no date is provided, today\'s date will be used automatically');
   process.exit(1);
+}
+
+// Show what date is being used
+if (!providedDate) {
+  console.log(`📅 No date provided, using today's date: ${newDate}`);
 }
 
 // Validate version format (simple check)
@@ -25,7 +41,13 @@ if (!/^\d+\.\d+\.\d+$/.test(newVersion)) {
   process.exit(1);
 }
 
-console.log(`🚀 Bumping version to ${newVersion}...`);
+// Validate date format (YYYY-MM-DD)
+if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+  console.error('❌ Invalid date format. Use YYYY-MM-DD format (e.g., 2025-01-27)');
+  process.exit(1);
+}
+
+console.log(`🚀 Bumping version to ${newVersion} with release date ${newDate}...`);
 
 // Files to update with their patterns
 const filesToUpdate = [
@@ -123,9 +145,79 @@ const filesToUpdate = [
   }
 ];
 
+// Source files with headers to update (version and release date)
+const sourceFilesWithHeaders = [
+  // JavaScript files
+  'bump-version.js',
+  'browser/web-ide-bridge.js',
+  'browser/version.js',
+  'server/web-ide-bridge-server.js',
+  'server/version.js',
+  'tests/browser/browser-test-runner.js',
+  'tests/browser/built-library.test.js',
+  'tests/browser/simple-browser.test.js',
+  'tests/e2e/full-workflow.test.js',
+  'tests/run-server-tests.js',
+  'tests/server/basic.test.js',
+  'tests/server/edge-cases.test.js',
+  'tests/server/performance.test.js',
+  'tests/server/quick-test.js',
+  'tests/server/server.test.js',
+  'tests/server/setup-server.js',
+  'tests/server/simple-import.test.js',
+  'tests/server/validation.test.js',
+  'tests/utils/websocket-utils.js',
+  // Go files
+  'desktop/web-ide-bridge.go',
+  'tests/desktop/desktop_test.go',
+  // Shell scripts
+  'desktop/build.sh'
+];
+
 let updatedFiles = 0;
 let errors = 0;
 
+// Function to update headers in source files
+function updateSourceFileHeaders() {
+  sourceFilesWithHeaders.forEach(file => {
+    try {
+      if (!fs.existsSync(file)) {
+        console.log(`⚠️  File not found: ${file}`);
+        return;
+      }
+
+      let content = fs.readFileSync(file, 'utf8');
+      let fileUpdated = false;
+
+      // Update version in header
+      const versionPattern = /\* @version\s+[\d.]+/;
+      if (versionPattern.test(content)) {
+        content = content.replace(versionPattern, `* @version         ${newVersion}`);
+        fileUpdated = true;
+      }
+
+      // Update release date in header
+      const releasePattern = /\* @release\s+[\d-]+/;
+      if (releasePattern.test(content)) {
+        content = content.replace(releasePattern, `* @release         ${newDate}`);
+        fileUpdated = true;
+      }
+
+      if (fileUpdated) {
+        fs.writeFileSync(file, content, 'utf8');
+        console.log(`✅ Updated headers: ${file}`);
+        updatedFiles++;
+      } else {
+        console.log(`ℹ️  No header changes needed: ${file}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error updating headers in ${file}:`, error.message);
+      errors++;
+    }
+  });
+}
+
+// Update regular files
 filesToUpdate.forEach(({ file, patterns }) => {
   try {
     if (!fs.existsSync(file)) {
@@ -157,6 +249,10 @@ filesToUpdate.forEach(({ file, patterns }) => {
   }
 });
 
+// Update source file headers
+console.log('\n📝 Updating source file headers...');
+updateSourceFileHeaders();
+
 console.log('\n📊 Summary:');
 console.log(`✅ Files updated: ${updatedFiles}`);
 if (errors > 0) {
@@ -173,4 +269,4 @@ if (errors === 0) {
 } else {
   console.log('\n⚠️  Version bump completed with errors. Please review the output above.');
   process.exit(1);
-} 
+}

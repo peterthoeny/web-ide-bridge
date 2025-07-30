@@ -1,5 +1,15 @@
 #!/bin/bash
-# build.sh - Build Web-IDE-Bridge for supported platforms
+
+# @name            Web-IDE-Bridge / Desktop
+# @tagline         Build script for Web-IDE-Bridge desktop application
+# @file            desktop/build.sh
+# @version         1.1.3
+# @release         2025-07-30
+# @repository      https://github.com/peterthoeny/web-ide-bridge
+# @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+# @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+# @license         GPL v3, see LICENSE file
+# @genai           99%, Cursor 1.2, Claude Sonnet 4
 
 # Check if we're in the correct directory
 if [ ! -f "web-ide-bridge.go" ] || [ ! -f "go.mod" ]; then

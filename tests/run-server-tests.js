@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Standalone Server Test Runner
- * Bypasses Jest environment issues by running server tests directly
+ * @name            Web-IDE-Bridge / Tests / Server
+ * @tagline         Standalone test runner for Web-IDE-Bridge server
+ * @description     Bypasses Jest environment issues by running server tests directly
+ * @file            tests/run-server-tests.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
  */
 
 const { spawn } = require('child_process');

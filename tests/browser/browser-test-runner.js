@@ -1,6 +1,15 @@
 /**
- * Browser Test Runner
- * Simple test runner for browser library tests without Jest dependency
+ * @name            Web-IDE-Bridge / Tests / Browser
+ * @tagline         Test runner for browser library tests
+ * @description     Test runner without Jest dependency
+ * @file            tests/browser/browser-test-runner.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
  */
 
 // Mock DOM environment for Node.js
@@ -209,4 +218,4 @@ async function runTests() {
 }
 
 // Export for use in test files
-module.exports = { runTests, TestRunner }; 
+module.exports = { runTests, TestRunner };

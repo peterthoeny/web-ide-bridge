@@ -1,4 +1,17 @@
-// Simple test to verify WebSocket import works
+/**
+ * @name            Web-IDE-Bridge / Tests / Server
+ * @tagline         Simple import test
+ * @description     Simple test to verify WebSocket import works
+ * @file            tests/server/simple-import.test.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
+
 const WebSocket = require('ws');
 
 describe('WebSocket Import Test', () => {
@@ -15,4 +28,4 @@ describe('WebSocket Import Test', () => {
     expect(wss.clients).toBeDefined();
     wss.close();
   });
-}); 
+});

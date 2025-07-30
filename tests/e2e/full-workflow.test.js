@@ -1,3 +1,17 @@
+/**
+ * @name            Web-IDE-Bridge / Tests / E2E
+ * @tagline         End-to-end workflow tests for Web-IDE-Bridge
+ * @description     Comprehensive tests for Web-IDE-Bridge
+ * @file            tests/e2e/full-workflow.test.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
+
 const WebIdeBridgeServer = require('../../server/web-ide-bridge-server');
 const { establishUserConnections, simulateEditWorkflow } = require('../utils/websocket-utils');
 

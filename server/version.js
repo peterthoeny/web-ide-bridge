@@ -1,7 +1,18 @@
-// Web-IDE-Bridge Server Version Configuration
-// Update this file to bump the version for the server component
+/**
+ * @name            Web-IDE-Bridge / Server
+ * @tagline         Component of Web-IDE-Bridge library for seamless IDE integration
+ * @description     Version configuration for the server component
+ * @file            server/version.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
 
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 
 module.exports = {
   VERSION,

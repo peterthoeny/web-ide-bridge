@@ -1,3 +1,17 @@
+/**
+ * @name            Web-IDE-Bridge / Tests / Server
+ * @tagline         Server tests
+ * @description     Tests for Web-IDE-Bridge server
+ * @file            tests/server/server.test.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
+
 // Import server from relative path (now we're in tests/server/)
 const WebIdeBridgeServer = require('../../server/web-ide-bridge-server');
 const { createTestClient, waitForWebSocketServer } = require('../utils/websocket-utils');
@@ -67,7 +81,7 @@ describe('WebIdeBridgeServer Core', () => {
       
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
-      expect(data.version).toBe('1.1.3');
+      expect(data.version).toBe('1.1.4');
       expect(data.uptime).toBeGreaterThanOrEqual(0);
       expect(data.timestamp).toBeDefined();
     });
@@ -84,7 +98,7 @@ describe('WebIdeBridgeServer Core', () => {
       
       expect(response.status).toBe(200);
       expect(data.active).toBe(true);
-      expect(data.version).toBe('1.1.3');
+      expect(data.version).toBe('1.1.4');
       expect(data.connections).toHaveProperty('browser');
       expect(data.connections).toHaveProperty('desktop');
       expect(data.connections).toHaveProperty('total');

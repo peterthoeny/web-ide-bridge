@@ -1,10 +1,19 @@
-// Web-IDE-Bridge Desktop Main
-// ---------------------------------------------
-// This file implements the main logic for the Web-IDE-Bridge desktop app.
-// It provides a Fyne-based UI, persistent config, WebSocket client, file watching,
-// and IDE launching for seamless code editing between browser and desktop.
+/**
+ * @name            Web-IDE-Bridge / Desktop
+ * @tagline         Desktop application for seamless IDE integration
+ * @description     Fyne-based UI, persistent config, WebSocket client, file watching,
+ *                  and IDE launching for seamless code editing between browser and desktop
+ * @file            desktop/web-ide-bridge.go
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
 
-package main
+ package main
 
 import (
 	"crypto/rand"
@@ -37,7 +46,7 @@ import (
 
 // Version variables that can be set via build flags
 var (
-	Version = "1.1.3" // Default version, can be overridden at build time
+	Version = "1.1.4" // Default version, can be overridden at build time
 )
 
 // getVersion returns the version string

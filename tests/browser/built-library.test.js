@@ -1,4 +1,17 @@
-// Test the built browser library
+/**
+ * @name            Web-IDE-Bridge / Tests / Browser
+ * @tagline         Tests for the built browser library
+ * @description     Tests for the built browser library using our custom test runner
+ * @file            tests/browser/built-library.test.js
+ * @version         1.1.4
+ * @release         2025-07-30
+ * @repository      https://github.com/peterthoeny/web-ide-bridge
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         GPL v3, see LICENSE file
+ * @genai           99%, Cursor 1.2, Claude Sonnet 4
+ */
+
 describe('Built Browser Library', () => {
   let WebIdeBridge;
 
@@ -203,4 +216,4 @@ describe('Built Browser Library', () => {
     
     expect(codeUpdateCallback).toHaveBeenCalledWith('test-snippet', 'updated code');
   });
-}); 
+});
