@@ -1,6 +1,6 @@
 {
   "name": "web-ide-bridge-browser",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Web-IDE-Bridge browser library for seamless IDE integration",
   "main": "web-ide-bridge.js",
   "files": [
@@ -9,7 +9,7 @@
     "demo.html"
   ],
   "scripts": {
-    "build": "terser web-ide-bridge.js -o web-ide-bridge.min.js --compress --mangle --source-map",
+    "build": "terser web-ide-bridge.js -o web-ide-bridge.min.js --compress --mangle --source-map --comments=\"/@name|@version|@release|@license|@file|@repository/\"",
     "clean": "rm -f web-ide-bridge.min.js web-ide-bridge.min.js.map"
   },
   "keywords": [

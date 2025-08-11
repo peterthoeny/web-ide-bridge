@@ -6,8 +6,8 @@
  * @description     Node.js and Express-based server with WebSocket support, rate limiting,
  *                  activity logging, and status page
  * @file            server/web-ide-bridge-server.js
- * @version         1.1.4
- * @release         2025-07-30
+ * @version         1.1.5
+ * @release         2025-08-11
  * @repository      https://github.com/peterthoeny/web-ide-bridge
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -180,6 +180,14 @@ class WebIdeBridgeServer {
         maxSessionAge: 24 * 60 * 60 * 1000,    // 24 hours
         enablePeriodicCleanup: true
       },
+       // Status page client behavior
+       statusPage: {
+         reconnect: {
+           maxAttempts: 3,
+           intervalMs: 10000,
+           statusTimeoutMs: 10000
+         }
+       },
       debug: process.env.DEBUG === 'true',
       environment: process.env.NODE_ENV || 'development'
     };
@@ -1093,6 +1101,12 @@ class WebIdeBridgeServer {
     // Get activity log entries
     const activityLogEntries = this.getActivityLogEntries(15);
 
+    // Pull reconnect settings with fallback defaults
+    const rc = this.config.statusPage?.reconnect || {};
+    const maxAttempts = Number.isInteger(rc.maxAttempts) ? rc.maxAttempts : 3;
+    const intervalMs = typeof rc.intervalMs === 'number' ? rc.intervalMs : 10000;
+    const statusTimeoutMs = typeof rc.statusTimeoutMs === 'number' ? rc.statusTimeoutMs : 10000;
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1460,25 +1474,111 @@ class WebIdeBridgeServer {
         // WebSocket-based real-time status updates
         let ws = null;
         let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        const reconnectInterval = 10000; // Reconnect every 10 seconds
+        const maxReconnectAttempts = ${maxAttempts};
+        const reconnectInterval = ${intervalMs}; // Reconnect interval (ms)
+        const statusTimeout = ${statusTimeoutMs}; // Timeout for status updates (ms)
         let connectionId = null;
         let lastStatusTime = 0;
         let statusTimeoutTimer = null;
-        const STATUS_TIMEOUT = 10000; // 10 seconds timeout for status updates
+        let reconnectTimeoutId = null;
+        let hasReachedMax = false;
 
         // Get WebSocket URL from current page
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = protocol + '//' + window.location.host + '/web-ide-bridge/ws';
 
+        // Local activity log (client-side)
+        const clientActivityLog = [];
+        const MAX_CLIENT_LOG = 50;
+        let lastServerActivity = [];
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatTime24h(date) {
+            var h = String(date.getHours()).padStart(2, '0');
+            var m = String(date.getMinutes()).padStart(2, '0');
+            var s = String(date.getSeconds()).padStart(2, '0');
+            return h + ':' + m + ':' + s;
+        }
+
+        function addClientLog(message, type = 'info') {
+            const now = new Date();
+            const time = formatTime24h(now);
+            clientActivityLog.unshift({ time, message: escapeHtml(message), type });
+            if (clientActivityLog.length > MAX_CLIENT_LOG) {
+                clientActivityLog.pop();
+            }
+            // Re-render combined log immediately
+            updateActivityLog(lastServerActivity);
+        }
+
+        function isWsOpen() {
+            return ws && ws.readyState === WebSocket.OPEN;
+        }
+
+        function isWsConnecting() {
+            return ws && ws.readyState === WebSocket.CONNECTING;
+        }
+
+        function reconnectIfNeeded(reason) {
+            try {
+                var isUserTrigger = (reason === 'focus' || reason === 'visibilitychange' || reason === 'online' || reason === 'manual');
+                if (hasReachedMax && !isUserTrigger) {
+                    return;
+                }
+                if (hasReachedMax && isUserTrigger) {
+                    // Allow user-driven triggers to reset max state and try again
+                    hasReachedMax = false;
+                    reconnectAttempts = 0;
+                }
+                if (!isWsOpen() && !isWsConnecting()) {
+                    // Reset attempts on user/OS-driven events so we always try again
+                    reconnectAttempts = 0;
+                    updateConnectionStatus('reconnecting...');
+                    if (reason) {
+                        addClientLog('Reconnect triggered: ' + reason, 'info');
+                    }
+                    connectWebSocket();
+                }
+            } catch (e) {
+                // no-op
+            }
+        }
+
         function connectWebSocket() {
             try {
+                if (hasReachedMax) {
+                    return;
+                }
+                // Avoid duplicate connections
+                if (isWsOpen() || isWsConnecting()) {
+                    return;
+                }
+
+                updateConnectionStatus('reconnecting...');
+                if (reconnectTimeoutId) {
+                    clearTimeout(reconnectTimeoutId);
+                    reconnectTimeoutId = null;
+                }
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = function() {
                     console.log('WebSocket connected for status updates');
                     reconnectAttempts = 0;
+                    hasReachedMax = false;
                     updateConnectionStatus('active');
+                    addClientLog('WebSocket connected', 'success');
+                    if (reconnectTimeoutId) {
+                        clearTimeout(reconnectTimeoutId);
+                        reconnectTimeoutId = null;
+                    }
 
                     // Send connection init with a unique ID
                     const statusConnectionId = 'status-page-' + Date.now();
@@ -1501,8 +1601,11 @@ class WebIdeBridgeServer {
                                 clearTimeout(statusTimeoutTimer);
                             }
                             statusTimeoutTimer = setTimeout(() => {
-                                updateConnectionStatus('down');
-                            }, STATUS_TIMEOUT);
+                                updateConnectionStatus('reconnecting...');
+                                // If no status for a while, proactively reconnect
+                                addClientLog('Status update timeout; reconnecting...', 'warning');
+                                reconnectIfNeeded('status-timeout');
+                            }, statusTimeout);
                         } else if (message.type === 'connection_ack') {
                             connectionId = message.connectionId;
                             console.log('Connection acknowledged with ID:', connectionId);
@@ -1521,7 +1624,10 @@ class WebIdeBridgeServer {
 
                 ws.onclose = function(event) {
                     console.log('WebSocket disconnected:', event.code, event.reason);
-                    updateConnectionStatus('down');
+                    updateConnectionStatus('reconnecting...');
+                    addClientLog('WebSocket disconnected' + (event && (event.code || event.reason)
+                        ? (' (' + (event.code || '') + (event.reason ? (' ' + event.reason) : '') + ')')
+                        : ''), 'warning');
 
                     // Clear timeout timer
                     if (statusTimeoutTimer) {
@@ -1530,15 +1636,25 @@ class WebIdeBridgeServer {
                     }
 
                     // Attempt to reconnect
-                    if (reconnectAttempts < maxReconnectAttempts) {
+                    if (!hasReachedMax && reconnectAttempts < maxReconnectAttempts) {
                         reconnectAttempts++;
-                        setTimeout(connectWebSocket, reconnectInterval);
+                        addClientLog('Reconnect attempt ' + reconnectAttempts + '/' + maxReconnectAttempts + ' in ' + Math.round(reconnectInterval / 1000) + 's', 'info');
+                        reconnectTimeoutId = setTimeout(connectWebSocket, reconnectInterval);
+                    } else {
+                        updateConnectionStatus('down');
+                        addClientLog('Max reconnect attempts reached; status DOWN', 'error');
+                        hasReachedMax = true;
+                        if (reconnectTimeoutId) {
+                            clearTimeout(reconnectTimeoutId);
+                            reconnectTimeoutId = null;
+                        }
                     }
                 };
 
                 ws.onerror = function(error) {
                     console.error('WebSocket error:', error);
-                    updateConnectionStatus('down');
+                    updateConnectionStatus('reconnecting...');
+                    addClientLog('WebSocket error', 'error');
                 };
 
             } catch (error) {
@@ -1555,6 +1671,8 @@ class WebIdeBridgeServer {
                     statusBadge.style.backgroundColor = '#10b981';
                 } else if (status === 'waiting') {
                     statusBadge.style.backgroundColor = '#f59e0b';
+                } else if (status === 'reconnecting...') {
+                    statusBadge.style.backgroundColor = '#3b82f6';
                 } else if (status === 'down') {
                     statusBadge.style.backgroundColor = '#ef4444';
                 }
@@ -1609,13 +1727,15 @@ class WebIdeBridgeServer {
         }
 
         function updateActivityLog(activityLog) {
+            lastServerActivity = Array.isArray(activityLog) ? activityLog : [];
             const logContainer = document.getElementById('activity-log');
             if (logContainer) {
-                if (activityLog.length > 0) {
-                    logContainer.innerHTML = activityLog.map(entry => 
-                        '<div class="log-entry ' + entry.type + '">' +
-                        '<span class="log-time">' + entry.time + '</span>' +
-                        '<span class="log-message">' + entry.message + '</span>' +
+                const combined = clientActivityLog.concat(lastServerActivity);
+                if (combined.length > 0) {
+                    logContainer.innerHTML = combined.map(entry => 
+                        '<div class="log-entry ' + (entry.type || 'info') + '">' +
+                        '<span class="log-time">' + (entry.time || '') + '</span>' +
+                        '<span class="log-message">' + (entry.message || '') + '</span>' +
                         '</div>'
                     ).join('');
                 } else {
@@ -1631,6 +1751,21 @@ class WebIdeBridgeServer {
 
             // Connect to WebSocket
             connectWebSocket();
+        });
+
+        // Reconnect triggers for common sleep/wake or network transitions
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                reconnectIfNeeded('visibilitychange');
+            }
+        });
+
+        window.addEventListener('focus', function() {
+            reconnectIfNeeded('focus');
+        });
+
+        window.addEventListener('online', function() {
+            reconnectIfNeeded('online');
         });
 
         function updateFooterLinks() {

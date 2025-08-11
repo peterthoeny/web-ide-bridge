@@ -3,8 +3,8 @@
  * @tagline         Edge cases and error handling tests for Web-IDE-Bridge server
  * @description     Tests for Web-IDE-Bridge server edge cases and error handling
  * @file            tests/server/edge-cases.test.js
- * @version         1.1.4
- * @release         2025-07-30
+ * @version         1.1.5
+ * @release         2025-08-11
  * @repository      https://github.com/peterthoeny/web-ide-bridge
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

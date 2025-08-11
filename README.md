@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.1.4
+# Web-IDE-Bridge v1.1.5
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.4-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.5-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ## Problem
 
@@ -181,7 +181,9 @@ npm start -- --port 8071
 npm start -- --config /path/to/config.conf
 ```
 
-**Server Status:** Visit [http://localhost:8071](http://localhost:8071) to see the beautiful status dashboard with real-time activity log.
+**Server Status:** Visit [http://localhost:8071](http://localhost:8071) to see the status dashboard with real-time activity log.
+
+Note: The status page now automatically re-establishes its WebSocket after system sleep, network changes, or when the tab regains focus.
 
 ### 3. Run Tests
 
