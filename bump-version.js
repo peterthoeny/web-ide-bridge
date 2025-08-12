@@ -109,6 +109,12 @@ const filesToUpdate = [
     ]
   },
   {
+    file: 'browser/index.html',
+    patterns: [
+      { from: /<span class="version">v[\d.]+<\/span>/, to: `<span class="version">v${newVersion}</span>` }
+    ]
+  },
+  {
     file: 'browser/demo.html',
     patterns: [
       { from: /<span class="version">v[\d.]+<\/span>/, to: `<span class="version">v${newVersion}</span>` }
