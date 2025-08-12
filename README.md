@@ -26,6 +26,13 @@ Web-IDE-Bridge provides a seamless bridge that allows you to:
 3. **✨ Edit with full IDE features** including syntax highlighting, completion, etc.
 4. **💾 Save in your IDE** and see changes instantly synchronized back to the web application
 
+## Features
+- 📱 **Modern UI**: Clean, centered header with app icon and version badge
+- ⚙️ **Configuration Management**: Supports multiple config file locations with embedded defaults
+- 🔄 **Real-time Status**: Connection status and activity monitoring
+- 🗂️ **File Watching**: Automatic detection of IDE file changes
+- 🌍 **Cross-Platform**: Built for macOS, Linux, and Windows (Intel and ARM)
+
 ## Project Structure
 
 ```
@@ -364,24 +371,22 @@ zip    bin/web-ide-bridge-linux-amd64.zip   bin/linux_amd64/web-ide-bridge
 zip    bin/Web-IDE-Bridge-windows-amd64.zip bin/windows_amd64/Web-IDE-Bridge.exe
 ```
 
-### Version Management
+#### Version Management
 
 Web-IDE-Bridge uses a centralized version management system:
 
 **📁 Version Files:**
 - `server/version.js` - Server version configuration
 - `browser/version.js` - Browser version configuration
-- `package.json` - Root version (used by desktop app via build flags)
+- `package.json` - Root version
 
 **🚀 Bumping Versions:**
-```bash
-# Bump to a new version (updates all files automatically)
-node bump-version.js 1.0.1
 
-# Manual version updates (if needed)
-# 1. Update version.js
-# 2. Update package.json files
-# 3. Update documentation files
+Bump to a new version (updates all files automatically)
+
+```bash
+node bump-version.js 1.1.5             # specify version, use today's release date
+node bump-version.js 1.1.5 2025-08-11  # specify version and release date
 ```
 
 **✅ Files Automatically Updated:**
@@ -391,18 +396,6 @@ node bump-version.js 1.0.1
 - Test files
 - Demo HTML files
 - Version files (server/version.js, browser/version.js)
-```
-
-**Features:**
-- 🎨 **Native App Icons**: Automatically uses platform-specific icons (PNG format for cross-platform compatibility)
-- 📱 **Modern UI**: Clean, centered header with app icon and version badge
-- 🍎 **macOS Integration**: Proper app bundle with correct Command+Tab and dock display
-- ⚙️ **Configuration Management**: Supports multiple config file locations with embedded defaults
-- 🔄 **Real-time Status**: Connection status and activity monitoring
-- 🗂️ **File Watching**: Automatic detection of IDE file changes
-- 🌍 **Cross-Platform**: Built for macOS, Linux, and Windows (Intel and ARM)
-
-Configure your preferred IDE and WebSocket server URL on first launch.
 
 ### 5. Try the Demos
 
@@ -554,6 +547,7 @@ Web-IDE-Bridge works with any IDE that can be launched from the command line:
 ### 🔧 Popular IDEs
 
 - **Visual Studio Code** - Full IntelliSense and extension support
+- **Cursor** - Agentive AI editor, based on Visual Studio Code
 - **Sublime Text** - Lightning-fast editing with powerful features
 - **Atom** - Hackable text editor with rich package ecosystem
 - **Vim/Neovim** - Modal editing with extensive customization
@@ -893,9 +887,6 @@ curl http://localhost:8071/web-ide-bridge/debug
 - Check network infrastructure and routing
 
 ## 📚 Additional Documentation
-
-### Test Documentation
-- **[TEST_STATUS.md](TEST_STATUS.md)**: Current test status, working tests, and recommendations
 
 ### Development Guides
 - **[developer_context.md](developer_context.md)**: **Technical implementation guide** - Detailed architecture, protocol specifications, security considerations, performance optimization, error handling patterns, and production deployment guidance for contributors and advanced users
