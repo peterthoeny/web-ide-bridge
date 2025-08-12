@@ -403,6 +403,7 @@ Web-IDE-Bridge includes two demo pages to showcase the integration:
 
 ```bash
 # Open demo pages in your browser
+open browser/index.html         # Overview, simple integration
 open browser/demo.html          # Standard integration demo
 open browser/jquery-demo.html   # Custom UI integration demo
 ```
