@@ -28,10 +28,28 @@ Web-IDE-Bridge provides a seamless bridge that allows you to:
 
 ## Features
 - 📱 **Modern UI**: Clean, centered header with app icon and version badge
-- ⚙️ **Configuration Management**: Supports multiple config file locations with embedded defaults
 - 🔄 **Real-time Status**: Connection status and activity monitoring
 - 🗂️ **File Watching**: Automatic detection of IDE file changes
 - 🌍 **Cross-Platform**: Built for macOS, Linux, and Windows (Intel and ARM)
+
+## Architecture
+
+Web-IDE-Bridge consists of three components working together:
+
+```
+┌─────────────┐    WebSocket    ┌──────────────┐    WebSocket    ┌─────────────┐
+│   Browser   │ ◄─────────────► │    Server    │ ◄─────────────► │   Desktop   │
+│  (Web App)  │                 │   (Relay)    │                 │     App     │
+└─────────────┘                 └──────────────┘                 └─────────────┘
+```
+
+### Components
+
+1. **🌐 Web-IDE-Bridge JavaScript Library** - Integrates into web applications to provide "Edit in IDE ↗" buttons
+2. **🔗 Web-IDE-Bridge Server** - Node.js WebSocket server that routes messages between browser and desktop
+3. **🖥️ Web-IDE-Bridge Desktop App** - Cross-platform Go/Fyne application that manages IDE integration
+
+**📖 For detailed technical implementation, protocol specifications, and advanced architecture information, see [developer_context.md](developer_context.md).**
 
 ## Project Structure
 
@@ -106,25 +124,6 @@ web-ide-bridge/
     └── utils/                          # Utilities used by tests
         └── websocket-utils.js              # WebSocket testing helpers
 ```
-
-## Architecture
-
-Web-IDE-Bridge consists of three components working together:
-
-```
-┌─────────────┐    WebSocket    ┌──────────────┐    WebSocket    ┌─────────────┐
-│   Browser   │ ◄─────────────► │    Server    │ ◄─────────────► │   Desktop   │
-│  (Web App)  │                 │   (Relay)    │                 │     App     │
-└─────────────┘                 └──────────────┘                 └─────────────┘
-```
-
-### Components
-
-1. **🌐 Web-IDE-Bridge JavaScript Library** - Integrates into web applications to provide "Edit in IDE ↗" buttons
-2. **🔗 Web-IDE-Bridge Server** - Node.js WebSocket server that routes messages between browser and desktop
-3. **🖥️ Web-IDE-Bridge Desktop App** - Cross-platform Go/Fyne application that manages IDE integration
-
-**📖 For detailed technical implementation, protocol specifications, and advanced architecture information, see [developer_context.md](developer_context.md).**
 
 ## Quick Start
 
