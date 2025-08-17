@@ -6,6 +6,8 @@ Web-IDE-Bridge allows developers to edit code snippets from web application text
 
 ![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.5-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
+![Web-IDE-Bridge screenshot](web-screenshot.png)
+
 ## Problem
 
 Modern web applications often include code editing capabilities through textarea elements, but these lack the rich feature set that developers expect from desktop IDEs:
