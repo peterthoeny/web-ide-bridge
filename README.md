@@ -398,14 +398,10 @@ node bump-version.js 1.1.5 2025-08-11  # specify version and release date
 
 ### 5. Try the Demos
 
-Web-IDE-Bridge includes two demo pages to showcase the integration:
-
-```bash
-# Open demo pages in your browser
-open browser/index.html         # Overview, simple integration
-open browser/demo.html          # Standard integration demo
-open browser/jquery-demo.html   # Custom UI integration demo
-```
+Web-IDE-Bridge includes demo pages to showcase the integration:
+- [browser/index.html](browser/index.html): Overview, simple integration
+- [browser/demo.html](browser/demo.html): Standard integration demo
+- [browser/jquery-demo.html](browser/jquery-demo.html): Custom UI integration demo
 
 **Demo Features:**
 - 🎨 **Consistent Branding**: App icons, version badges, and favicons
