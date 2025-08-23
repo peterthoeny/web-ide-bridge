@@ -3,8 +3,8 @@
  * @tagline         Basic server functionality tests
  * @description     Tests for Web-IDE-Bridge server functionality
  * @file            tests/server/basic.test.js
- * @version         1.1.5
- * @release         2025-08-11
+ * @version         1.1.6
+ * @release         2025-08-23
  * @repository      https://github.com/peterthoeny/web-ide-bridge
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -143,7 +143,7 @@ describe('Basic Server Functionality', () => {
 
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
-      expect(data.version).toBe('1.1.5');
+      expect(data.version).toBe('1.1.6');
     });
 
     test('should respond to status endpoint with JSON for API calls', async () => {
@@ -157,7 +157,7 @@ describe('Basic Server Functionality', () => {
 
       expect(response.status).toBe(200);
       expect(data.active).toBe(true);
-      expect(data.version).toBe('1.1.5');
+      expect(data.version).toBe('1.1.6');
       expect(data.connections).toBeDefined();
       expect(data.sessions).toBeDefined();
       expect(data.metrics).toBeDefined();

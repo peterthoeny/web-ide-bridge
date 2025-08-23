@@ -4,8 +4,8 @@
  * @description     Fyne-based UI, persistent config, WebSocket client, file watching,
  *                  and IDE launching for seamless code editing between browser and desktop
  * @file            desktop/web-ide-bridge.go
- * @version         1.1.5
- * @release         2025-08-11
+ * @version         1.1.6
+ * @release         2025-08-23
  * @repository      https://github.com/peterthoeny/web-ide-bridge
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -46,7 +46,7 @@ import (
 
 // Version variables that can be set via build flags
 var (
-	Version = "1.1.5" // Default version, can be overridden at build time
+	Version = "1.1.6" // Default version, can be overridden at build time
 )
 
 // getVersion returns the version string

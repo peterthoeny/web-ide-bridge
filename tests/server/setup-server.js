@@ -3,8 +3,8 @@
  * @tagline         Server-specific test setup
  * @description     Setup for Web-IDE-Bridge server tests
  * @file            tests/server/setup-server.js
- * @version         1.1.5
- * @release         2025-08-11
+ * @version         1.1.6
+ * @release         2025-08-23
  * @repository      https://github.com/peterthoeny/web-ide-bridge
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2025 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

@@ -1,10 +1,10 @@
-# Web-IDE-Bridge v1.1.5
+# Web-IDE-Bridge v1.1.6
 
 **Bridge the gap between web applications and desktop IDEs**
 
 Web-IDE-Bridge allows developers to edit code snippets from web application textareas directly in their preferred desktop IDE, with automatic synchronization back to the browser.
 
-![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.5-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
+![Web-IDE-Bridge Demo](https://img.shields.io/badge/status-active%20development-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.6-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-red)
 
 ![Web-IDE-Bridge screenshot](web-screenshot.png)
 
